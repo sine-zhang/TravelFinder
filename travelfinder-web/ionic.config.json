@@ -1,0 +1,7 @@
+{
+  "name": "smart-planning-v1",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular-standalone"
+}
