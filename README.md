@@ -10,6 +10,5 @@ Use cases
 
 Screenshots
 ---------
-<IMG  src="https://dev.azure.com/SuperSine/90b8b772-92ff-49e0-b0fa-870d112bba22/_apis/git/repositories/f307c133-081e-40d1-8ae3-f052c1cb0871/Items?path=/.attachments/localhost_4200_plan(iPad%20Mini)-646c5bd6-4ce5-4495-852b-e4684478c807.png&amp;download=false&amp;resolveLfs=true&amp;%24format=octetStream&amp;api-version=5.0-preview.1&amp;sanitize=true&amp;versionDescriptor.version=wikiMaster"  alt="localhost_4200_plan(iPad Mini).png"/>
-
-<IMG  src="https://dev.azure.com/SuperSine/90b8b772-92ff-49e0-b0fa-870d112bba22/_apis/git/repositories/f307c133-081e-40d1-8ae3-f052c1cb0871/Items?path=/.attachments/localhost_4200_plan(iPad%20Mini)%20(1)-500db8e6-8ca2-4036-9c9e-1786b49d1318.png&amp;download=false&amp;resolveLfs=true&amp;%24format=octetStream&amp;api-version=5.0-preview.1&amp;sanitize=true&amp;versionDescriptor.version=wikiMaster"  alt="localhost_4200_plan(iPad Mini) (1).png"/>
+![image](https://github.com/sine-zhang/travelfinder/assets/175175559/b0bd19c8-2bd4-4522-b49b-84f288070202)
+![image](https://github.com/sine-zhang/travelfinder/assets/175175559/68f81f10-83f5-4741-9d73-ce58a2fde4f7)
