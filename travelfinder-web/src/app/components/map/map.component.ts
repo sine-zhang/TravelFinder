@@ -77,6 +77,8 @@ export class MapComponent  implements OnInit, OnChanges {
   ngOnChanges(changes: SimpleChanges) {
     const layers = changes["layers"]?.currentValue as Array<GraphicsLayer>;
     if (layers) {
+      this.webmap.layers.removeAll();
+
       layers.forEach(layer => this.webmap.add(layer));
       this.view.goTo(layers[1].graphics.toArray(), { duration: 0, easing: "linear" });
     }

@@ -8,6 +8,8 @@ import { InputComponent } from '@ui5/webcomponents-ngx/main/input';
 import { PopoverComponent } from '@ui5/webcomponents-ngx/main/popover';
 import { IconComponent } from '@ui5/webcomponents-ngx/main/icon';
 import { TextAreaComponent } from "@ui5/webcomponents-ngx/main/text-area";
+import { BusyIndicatorComponent } from "@ui5/webcomponents-ngx/main/busy-indicator";
+import { MessageStripComponent } from "@ui5/webcomponents-ngx/main/message-strip";
 
 import "@ui5/webcomponents-icons/dist/AllIcons.js"
 
@@ -21,7 +23,9 @@ import "@ui5/webcomponents-icons/dist/AllIcons.js"
     InputComponent,
     PopoverComponent,
     IconComponent,
-    TextAreaComponent
+    TextAreaComponent,
+    BusyIndicatorComponent,
+    MessageStripComponent
   ],
   imports: [
     Ui5WebcomponentsModule,
@@ -30,7 +34,9 @@ import "@ui5/webcomponents-icons/dist/AllIcons.js"
     InputComponent,
     PopoverComponent,
     IconComponent,
-    TextAreaComponent
+    TextAreaComponent,
+    BusyIndicatorComponent,
+    MessageStripComponent
   ]
 })
 export class UI5Module { }

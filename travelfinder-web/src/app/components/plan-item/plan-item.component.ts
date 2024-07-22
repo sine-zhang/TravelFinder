@@ -6,6 +6,8 @@ import { FormsModule } from '@angular/forms';
 
 import { UI5Module } from "../../shared/ui5.module";
 import { IonicsModule } from "../../shared/ionics.module"
+import { AppLoaderComponent } from '../app-loader/app-loader.component';
+import { LoadingDirective } from 'src/app/directives/app-loading.directive';
 
 export interface PlanItem {
   id:string,
@@ -22,7 +24,9 @@ export interface PlanItem {
     UI5Module,
     RouterModule,
     FormsModule,
-    IonicsModule
+    IonicsModule,
+    AppLoaderComponent,
+    LoadingDirective
   ]
 })
 export class PlanItemComponent  implements OnInit {

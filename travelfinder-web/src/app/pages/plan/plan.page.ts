@@ -15,6 +15,7 @@ import { ApiService, Creator, MessageBody } from 'src/app/services/api.service';
 import * as webMercatorUtils from '@arcgis/core/geometry/support/webMercatorUtils';
 import { LoadingDirective } from 'src/app/directives/app-loading.directive';
 import { AppLoaderComponent } from 'src/app/components/app-loader/app-loader.component';
+import { Helper } from 'src/app/shared/helper';
 
 @Component({
   selector: 'sp-plan',
@@ -34,7 +35,7 @@ import { AppLoaderComponent } from 'src/app/components/app-loader/app-loader.com
 })
 export class PlanPage implements OnInit {
 
-  constructor(private router:Router, private routeService: RouteService, private fb:FormBuilder, private api:ApiService) {
+  constructor(private router:Router, private routeService: RouteService, private fb:FormBuilder, private api:ApiService, private helper: Helper) {
     this.inputForm = this.fb.group({
       prompt: ['', Validators.required]
     });
@@ -67,7 +68,7 @@ export class PlanPage implements OnInit {
 
     console.log(radius);
 
-    view.on("click", (event:any) => {
+    view.on("drag", (event:any) => {
       let mapCenter = view.extent.center;
 
       var newPoint = webMercatorUtils.webMercatorToGeographic(mapCenter);
@@ -93,23 +94,93 @@ export class PlanPage implements OnInit {
   }
 
   async submit() {
+    this.isLoading = true;
+    this.errorMessage = "";
+
     let prompt = this.inputForm.getRawValue().prompt;
 
-    this.messageBody.messages.push({
+    const requestMessages = [...this.messageBody.messages, {
       content: prompt,
       role: Creator.Me
-    });
+    }]
 
     const lat = this.currentCoords.lat;
     const lng = this.currentCoords.lng;
-    const locations = await this.api.getCommandByMessages(this.messageBody.messages, lat, lng);
+    const message = await this.api.getCommandByMessages(requestMessages, lat, lng);
+    const content = message.Choices[0]?.Message.content;
+    
+    this.isLoading = false;
 
-    this.layers = this.routeService.createRouteLayer(locations.map((location:any) => {
-        return new Point({
-          latitude: location.Latitude,
-          longitude: location.Longitude
-        })
-    })).pipe();
+    const error = this.getError(content);
+
+    if (error) {
+      this.errorMessage = error;
+    } else {
+      const locations = this.getLocations(content);
+  
+      if (locations) {
+        this.messageBody.messages = this.messageBody.messages.concat([
+        {
+          content: prompt,
+          role: Creator.Me
+        },
+        {
+          content: content,
+          role: Creator.Bot
+        }]);
+    
+        this.saveMessages(this.planId, this.messageBody);
+    
+        this.layers = this.routeService.createRouteLayer(locations.map((location:any) => {
+            return new Point({
+              latitude: location.Latitude || location.latitude,
+              longitude: location.Longitude || location.longitude
+            })
+        })).pipe();
+      }
+    }
+  }
+
+  getLocations(result: any) {
+    const plan = JSON.parse(result);
+    const locations = plan.Locations.map((place:any) => place.Location);
+
+    return locations;
+  }
+
+  getError(result: any) {
+    if (!this.helper.isJson(result)) {
+      return result;
+    }
+
+    const errorResult = JSON.parse(result);
+
+    return errorResult.Error || errorResult.Message;
+  }
+
+  clearError() {
+    this.errorMessage = "";
+  }
+
+  readMessags(planId:string) {
+    const messageValue = localStorage.getItem(planId);
+    let messageBody:MessageBody = {
+      system: "",
+      messages: [],
+      tokenUsed: 0
+    };
+
+    if(messageValue) {
+      messageBody = JSON.parse(messageValue);
+    }
+
+    return messageBody;
+  }
+
+  saveMessages(planId:string, messageBody:MessageBody) {
+    const messageValue = JSON.stringify(messageBody);
+
+    localStorage.setItem(planId, messageValue);
   }
 
   layers: Observable<GraphicsLayer[]> = new Observable<GraphicsLayer[]>();
@@ -119,4 +190,6 @@ export class PlanPage implements OnInit {
     lng:number
   };
   messageBody:MessageBody;
+  isLoading:boolean = false;
+  errorMessage: string = "";
 }

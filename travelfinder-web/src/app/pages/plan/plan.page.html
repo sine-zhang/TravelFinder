@@ -11,24 +11,37 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content [fullscreen]="true">
-  <map [layers]="layers | async" (onReady)="onMapReady($event)"></map>
-</ion-content>
+  <ion-content [fullscreen]="true">
+    <map [layers]="layers | async" (onReady)="onMapReady($event)"></map>
+  </ion-content>
 
+  
+  <!-- <ion-content>
+    <ion-button id="open-modal" expand="block">Open Sheet Modal</ion-button>
 
-<div class="m-2 relative flex h-28 justify-center">
-  <div class="w-full md:w-3/5 py-2 md:px-4 relative border border-gray/10 rounded-md shadow-[0_0_10px_rgba(0,0,0,0.90)] chat-background" *appLoading="true">
-    <div [formGroup]="inputForm" style="display:flex;">
-      <ui5-textarea formControlName="prompt" class="w-96 textarea-width plan-message"
-                    placeholder="Type no more than 10 symbols"
-                    maxlength="200">
-      </ui5-textarea>
-      <button slot="end"
-              class="absolute p-5 rounded-sm text-gray-500 bottom-7 right-1 hover:bg-gray-100"
-              (click)="submit()"
-              >
-        <ui5-icon class="send" name="paper-plane"></ui5-icon>
-      </button>
+    <ion-modal trigger="open-modal" [initialBreakpoint]="0.50" [breakpoints]="[0, 1]">
+      <ng-template>
+        <div class="block">Block of Content</div>
+      </ng-template>
+    </ion-modal>
+  </ion-content> -->
+  
+  
+  <div class="send-container">
+    <ui5-message-strip class="md:w-3/5" design="Information" [hidden]="!errorMessage" (close)="clearError()">{{errorMessage}}</ui5-message-strip>
+    <div class="m-2 relative flexbox justify-center md:w-3/5 ">
+      <div class="w-full py-2 md:px-4 relative border border-gray/10 rounded-md shadow-[0_0_10px_rgba(0,0,0,0.90)] chat-background">
+        <div [formGroup]="inputForm" class="inputForm">
+          <ui5-textarea formControlName="prompt" class="textarea-width plan-message"
+            placeholder="Where you wanna go?"
+            maxlength="200">
+          </ui5-textarea>
+          <button slot="end"
+            class="send-button rounded-sm text-gray-500 hover:bg-gray-100"
+            (click)="submit()">
+            <ui5-icon class="send-icon" name="paper-plane" *appIsLoading="isLoading"></ui5-icon>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
-</div>

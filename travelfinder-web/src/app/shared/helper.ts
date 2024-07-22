@@ -1,6 +1,8 @@
 import {Injectable} from "@angular/core";
 
-@Injectable()
+@Injectable({
+    providedIn: 'root'
+})
 export class Helper {
   generateUUID = () => {
     var d = new Date().getTime();//Timestamp
@@ -18,4 +20,12 @@ export class Helper {
     });
   };
 
+   isJson = (str:string) => {
+    try {
+        JSON.parse(str);
+    } catch (e) {
+        return false;
+    }
+    return true;
+}
 }

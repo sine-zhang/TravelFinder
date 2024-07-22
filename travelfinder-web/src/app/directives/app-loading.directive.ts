@@ -1,13 +1,13 @@
 import { ViewContainerRef, Directive, inject, TemplateRef, Input } from '@angular/core';
 import { AppLoaderComponent } from '../components/app-loader/app-loader.component';
+import { BusyIndicatorComponent } from "@ui5/webcomponents-ngx/main/busy-indicator";
 
 @Directive({
-  selector: '[appLoading]',
-  standalone: true
+  selector: '[appIsLoading]',
+  standalone: true,
 })
 export class LoadingDirective {
-  private readonly templateRef = inject(TemplateRef<any>);
-  private readonly vcRef = inject(ViewContainerRef);
+  constructor(private templateRef: TemplateRef<any>, private vcRef: ViewContainerRef){}
 
   @Input()
   set appIsLoading(loading: boolean) {

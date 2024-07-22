@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { environment } from 'src/environments/environment';
+import { Helper } from '../shared/helper';
 
 export interface MessageBody{
   messages: Message[],
@@ -21,7 +22,7 @@ export class ApiService {
   public nextMessage = new BehaviorSubject<DoneMessage|null>(null);
   private messages = new BehaviorSubject<Message[]>([]);
 
-  constructor() { }
+  constructor(private helper:Helper) { }
 
   async getCommandByMessages(messages: Message[], lat: number, lng: number){
     const fullMessage = {
@@ -49,10 +50,7 @@ export class ApiService {
 
     const result = JSON.parse(responseBody);
 
-    const plan = JSON.parse(result.Choices[0]?.Message.content);
-    const locations = plan.Locations.map((place:any) => place.Location);
-
-    return locations;
+    return result;
   }
 
   async getCompletionByMessages(messages: Message[], systemId: string = '') {
