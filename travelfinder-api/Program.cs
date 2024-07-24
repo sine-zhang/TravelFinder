@@ -7,13 +7,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddScoped<GmpGisApiClient>(services =>
 {
-    var configuration = services.GetService<IConfiguration>();
+    var configuration = services.GetService<IConfiguration>() ?? throw new InvalidOperationException("Configuration not found");
 
-    var apiKey = configuration != null ? configuration["GMPGIS_API_KEY"] : "";
-    var enableProxy = configuration != null ? configuration["ENABLE_PROXY"] : "";
-    var isProxy = Convert.ToBoolean(enableProxy);
+    var apiKey = configuration["GMPGIS_API_KEY"] ?? "";
+    var isProxy = bool.TryParse(configuration["ENABLE_PROXY"], out var enableProxy) && enableProxy;
+    var proxyAddress = configuration["PROXY_ADDRESS"] ?? "";
 
-    return new GmpGisApiClient(apiKey, isProxy);
+    return new GmpGisApiClient(apiKey, isProxy, proxyAddress);
 });
 
 builder.Services.AddControllers();

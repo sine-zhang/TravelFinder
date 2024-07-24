@@ -5,10 +5,11 @@ namespace TravelfinderAPI
 {
     public class ArcGisApiClient
     {
-        public ArcGisApiClient(string apiKey, bool enableProxy)
+        public ArcGisApiClient(string apiKey, bool enableProxy,string proxyAddress)
         {
             _apiKey = apiKey;
             _enableProxy = enableProxy;
+            _proxyAddress = proxyAddress;
         }
 
         private HttpClient GetNewClient(bool enableProxy)
@@ -17,7 +18,7 @@ namespace TravelfinderAPI
 
             if (enableProxy)
             {
-                client = Utils.CreateProxy($"http://127.0.0.1:2084");
+                client = Utils.CreateProxy(_proxyAddress);
             }
             else
             {
@@ -59,6 +60,7 @@ namespace TravelfinderAPI
         private readonly HttpClient _httpClient;
         private readonly string _apiKey;
         private readonly bool _enableProxy;
+        private readonly string _proxyAddress;
     }
 
     public class PlaceResult

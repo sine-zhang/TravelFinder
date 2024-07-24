@@ -15,13 +15,13 @@ namespace TravelfinderAPI
         public double Latitude { get; set; }
         public double Longitude { get; set; }
 
-        public OpenAIApiClient(string apiKey, bool enableProxy)
+        public OpenAIApiClient(string apiKey, bool enableProxy, string proxyAddress)
         {
             if(enableProxy)
             {
                 var proxy = new WebProxy
                 {
-                    Address = new Uri($"http://127.0.0.1:2084"),
+                    Address = new Uri(proxyAddress),
                     BypassProxyOnLocal = false,
                     UseDefaultCredentials = false,
                 };

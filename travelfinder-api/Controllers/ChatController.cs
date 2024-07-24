@@ -19,14 +19,14 @@ namespace TravelfinderAPI.Controllers
         private string _openAiKey;
         private PromotTemplate[] _promotTemplate;
         private readonly bool _enableProxy;
-
+        private readonly string _proxyAddress;
         public ChatController(ILogger<ChatController> logger, IConfiguration configuration, GmpGisApiClient gmpGisApiClient)
         {
             _logger = logger;
             _openAiKey = configuration["OPENAI_API_KEY"];
             _enableProxy = Convert.ToBoolean(configuration["ENABLE_PROXY"]);
             _promotTemplate = configuration.GetSection("PROMOT_TEMPLATE").Get<PromotTemplate[]>();
-
+            _proxyAddress = configuration["PROXY_ADDRESS"];
             _gmpGisApiClient = gmpGisApiClient;
         }
 
@@ -35,7 +35,7 @@ namespace TravelfinderAPI.Controllers
         {
             await HttpContext.SSEInitAsync();
 
-            var openAiClient = new OpenAIApiClient(_openAiKey, _enableProxy);
+            var openAiClient = new OpenAIApiClient(_openAiKey, _enableProxy, _proxyAddress);
 
             var responseStream = await openAiClient.SendPromptStream(prompt);
 
@@ -65,7 +65,7 @@ namespace TravelfinderAPI.Controllers
 
             var placeResult = await _gmpGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 1000, "en-us", 20);
 
-            var openAiClient = new OpenAIApiClient(_openAiKey, _enableProxy);
+            var openAiClient = new OpenAIApiClient(_openAiKey, _enableProxy, _proxyAddress);
 
             var messages = messageRequest.Messages;
             var systemMessage = _promotTemplate.FirstOrDefault(x => x.Id == messageRequest.SystemId);
@@ -101,7 +101,7 @@ namespace TravelfinderAPI.Controllers
 
             _openAiKey = Request.Headers["Joi-ApiKey"];
 
-            var openAiClient = new OpenAIApiClient(_openAiKey, _enableProxy);
+            var openAiClient = new OpenAIApiClient(_openAiKey, _enableProxy, _proxyAddress);
 
             var messages = messageRequest.Messages;
             var systemMessage = _promotTemplate.FirstOrDefault(x => x.Id == messageRequest.SystemId);

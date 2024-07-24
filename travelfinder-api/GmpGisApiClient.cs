@@ -7,10 +7,11 @@ namespace TravelfinderAPI.GmpGis
 {
     public class GmpGisApiClient
     {
-        public GmpGisApiClient(string apiKey, bool enableProxy)
+        public GmpGisApiClient(string apiKey, bool enableProxy,string proxyAddress)
         {
             _apiKey = apiKey;
             _enableProxy = enableProxy;
+            _proxyAddress = proxyAddress;
         }
 
         private HttpClient GetNewClient(bool enableProxy)
@@ -19,7 +20,7 @@ namespace TravelfinderAPI.GmpGis
 
             if (enableProxy)
             {
-                client = Utils.CreateProxy($"http://127.0.0.1:2084");
+                client = Utils.CreateProxy(_proxyAddress);
             }
             else
             {
@@ -94,6 +95,7 @@ namespace TravelfinderAPI.GmpGis
         private readonly HttpClient _httpClient;
         private readonly string _apiKey;
         private readonly bool _enableProxy;
+        private readonly string _proxyAddress;
 
         private double _latitude;
         private double _longitude;
