@@ -15,19 +15,24 @@ namespace TravelfinderAPI.Controllers
     public class ChatController : ControllerBase
     {
         private GmpGisApiClient _gmpGisApiClient;
+        private ArcGisApiClient _arcGisApiClient;
         private readonly ILogger<ChatController> _logger;
         private string _openAiKey;
         private PromotTemplate[] _promotTemplate;
         private readonly bool _enableProxy;
-        private readonly string _proxyAddress;
-        public ChatController(ILogger<ChatController> logger, IConfiguration configuration, GmpGisApiClient gmpGisApiClient)
+        private OpenAIApiClient _openAIApiClient;
+
+        public ChatController(ILogger<ChatController> logger, IConfiguration configuration, GmpGisApiClient gmpGisApiClient, ArcGisApiClient arcGisApiClient)
         {
             _logger = logger;
             _openAiKey = configuration["OPENAI_API_KEY"];
             _enableProxy = Convert.ToBoolean(configuration["ENABLE_PROXY"]);
             _promotTemplate = configuration.GetSection("PROMOT_TEMPLATE").Get<PromotTemplate[]>();
-            _proxyAddress = configuration["PROXY_ADDRESS"];
+
             _gmpGisApiClient = gmpGisApiClient;
+            _arcGisApiClient = arcGisApiClient;
+
+            _openAIApiClient = new OpenAIApiClient(_openAiKey, _enableProxy, arcGisApiClient);
         }
 
         [HttpGet]
@@ -35,9 +40,7 @@ namespace TravelfinderAPI.Controllers
         {
             await HttpContext.SSEInitAsync();
 
-            var openAiClient = new OpenAIApiClient(_openAiKey, _enableProxy, _proxyAddress);
-
-            var responseStream = await openAiClient.SendPromptStream(prompt);
+            var responseStream = await _openAIApiClient.SendPromptStream(prompt);
 
             using (var reader = new StreamReader(responseStream))
             {
@@ -65,8 +68,6 @@ namespace TravelfinderAPI.Controllers
 
             var placeResult = await _gmpGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 1000, "en-us", 20);
 
-            var openAiClient = new OpenAIApiClient(_openAiKey, _enableProxy, _proxyAddress);
-
             var messages = messageRequest.Messages;
             var systemMessage = _promotTemplate.FirstOrDefault(x => x.Id == messageRequest.SystemId);
 
@@ -87,10 +88,46 @@ namespace TravelfinderAPI.Controllers
             })
             .ToList();
 
-            var completion = await openAiClient.SendCommands(messages.ToArray());
+            var completion = await _openAIApiClient.SendCommands(messages.ToArray(), messageRequest.Latitude, messageRequest.Longitude);
 
             return Ok(JsonConvert.SerializeObject(completion));
 
+        }
+
+        [HttpPost]
+        [Route("Hint")]
+        public async Task<ActionResult> Hint([FromBody] MessageRequest messageRequest)
+        {
+            var placeResult = await _gmpGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 1000, "en-us", 20);
+
+            var message = messageRequest.Messages.First();
+            var systemMessage = _promotTemplate.First(template => template.Id == "gis_helper_2");
+
+            var target = JsonConvert.DeserializeObject<Plan[]>(message.Content);
+
+            var hint = JsonConvert.SerializeObject(new Hint()
+            {
+                Source = placeResult.Places,
+                Target = target
+            });
+
+            var messages = new Message[]
+            {
+                new Message()
+                {
+                    Role = "system",
+                    Content = systemMessage.Promot.ToString()
+                },
+                new Message()
+                {
+                    Role = "user",
+                    Content = hint
+                }
+            };
+
+            var completion = await _openAIApiClient.SendCommands(messages.ToArray(), messageRequest.Latitude, messageRequest.Longitude);
+
+            return Ok(JsonConvert.SerializeObject(completion));
         }
 
         [HttpPost]
@@ -98,10 +135,6 @@ namespace TravelfinderAPI.Controllers
         public async Task Post([FromBody] MessageRequest messageRequest)
         {
             await HttpContext.SSEInitAsync();
-
-            _openAiKey = Request.Headers["Joi-ApiKey"];
-
-            var openAiClient = new OpenAIApiClient(_openAiKey, _enableProxy, _proxyAddress);
 
             var messages = messageRequest.Messages;
             var systemMessage = _promotTemplate.FirstOrDefault(x => x.Id == messageRequest.SystemId);
@@ -112,7 +145,7 @@ namespace TravelfinderAPI.Controllers
                 Content = systemMessage == null ? "You are ChatGPT, a large language model trained by OpenAI. Follow the user's instructions carefully. Respond using markdown format." : systemMessage.Promot
             }).ToList();
             
-            var responseStream = await openAiClient.SendMessages(messages.ToArray());
+            var responseStream = await _openAIApiClient.SendMessages(messages.ToArray());
 
             var tiktoken = TikToken.EncodingForModel("gpt-3.5-turbo");
             string completeMessage = string.Empty;

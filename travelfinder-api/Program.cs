@@ -7,13 +7,27 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddScoped<GmpGisApiClient>(services =>
 {
-    var configuration = services.GetService<IConfiguration>() ?? throw new InvalidOperationException("Configuration not found");
+    var configuration = services.GetService<IConfiguration>();
 
-    var apiKey = configuration["GMPGIS_API_KEY"] ?? "";
-    var isProxy = bool.TryParse(configuration["ENABLE_PROXY"], out var enableProxy) && enableProxy;
-    var proxyAddress = configuration["PROXY_ADDRESS"] ?? "";
+    var apiKey = configuration != null ? configuration["GMPGIS_API_KEY"] : "";
+    var enableProxy = configuration != null ? configuration["ENABLE_PROXY"] : "";
+    var isProxy = Convert.ToBoolean(enableProxy);
 
-    return new GmpGisApiClient(apiKey, isProxy, proxyAddress);
+    return new GmpGisApiClient(apiKey, isProxy);
+});
+
+builder.Services.AddScoped<ArcGisApiClient>(services =>
+{
+    var configuration = services.GetService<IConfiguration>();
+
+    var apiKey = configuration != null ? configuration["ARCGIS_API_KEY"] : "";
+    var enableProxy = configuration != null ? configuration["ENABLE_PROXY"] : "";
+    var isProxy = Convert.ToBoolean(enableProxy);
+
+    var featureLayers = configuration.GetSection("FEATURE_LAYER").Get<string[]>();
+    var pointLayerUrl = featureLayers[1];
+
+    return new ArcGisApiClient(apiKey, isProxy, pointLayerUrl);
 });
 
 builder.Services.AddControllers();

@@ -3,6 +3,8 @@
 ################################################################################
 
 /travelfinder-api/bin/Debug
-/travelfinder-api/obj
+/travelfinder-api/obj/Debug
 /travelfinder-api/.vs/TravelfinderAPI/DesignTimeBuild
 /travelfinder-api/.vs/TravelfinderAPI
+/travelfinder-api/obj
+/travelfinder-api/.vs/ProjectEvaluation
