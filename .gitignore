@@ -1,0 +1,8 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/travelfinder-api/bin/Debug
+/travelfinder-api/obj
+/travelfinder-api/.vs/TravelfinderAPI/DesignTimeBuild
+/travelfinder-api/.vs/TravelfinderAPI
