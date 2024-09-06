@@ -31,8 +31,19 @@
 
 .send-container {
   display: flex;
-  justify-content: center;
+  justify-content: end;
   flex-direction: column;
-  height: 10%;
+  height: 15%;
   align-items: center;
+}
+
+ui5-button:disabled {
+  opacity: 100;
+}
+
+
+@media (max-width: 700px) {
+  .send-container {
+    align-items: unset;
+  }
 }

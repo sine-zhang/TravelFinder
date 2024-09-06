@@ -27,7 +27,7 @@ const MAX_SCALE = 50000;
   styleUrls: ['./map.component.scss'],
   standalone: true
 })
-export class MapComponent  implements OnInit, OnChanges {
+export class MapComponent implements OnInit, OnChanges {
 
   constructor() {
   }
@@ -39,7 +39,8 @@ export class MapComponent  implements OnInit, OnChanges {
       container,
       map: this.webmap,
       zoom: 4, // Sets zoom level based on level of detail (LOD)
-      center: [15, 65] // Sets center point of view using longitude,latitude
+      center: [15, 65], // Sets center point of view using longitude,latitude,
+      spatialReference: { wkid: 3857 },
     });
 
     return this.view.when();
@@ -66,21 +67,32 @@ export class MapComponent  implements OnInit, OnChanges {
   showCenterPoint() {
     var point = this.getCenterPoint();
 
-    if (point)
-    {
+    if (point) {
       var newPoint = webMercatorUtils.webMercatorToGeographic(point);
       console.log(newPoint.toJSON());
     }
 
   }
 
-  ngOnChanges(changes: SimpleChanges) {
+  async ngOnChanges(changes: SimpleChanges) {
     const layers = changes["layers"]?.currentValue as Array<GraphicsLayer>;
-    if (layers) {
-      this.webmap.layers.removeAll();
+    this.webmap.layers.removeAll();
 
+    if (layers) {
       layers.forEach(layer => this.webmap.add(layer));
-      this.view.goTo(layers[1].graphics.toArray(), { duration: 0, easing: "linear" });
+      this.view.goTo(layers[1].graphics.toArray(), {duration: 0, easing: "linear"});
+    } else {
+      const position = await Geolocation.getCurrentPosition();
+
+      let pt = new Point({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude
+      });
+
+      this.view?.goTo({
+        target:pt,
+        zoom: 10
+      });
     }
   }
 
@@ -90,7 +102,7 @@ export class MapComponent  implements OnInit, OnChanges {
   view!: MapView;
 
   webmap = new WebMap({
-    basemap: "topo-vector" //Reference to the base of the map
+    basemap: "topo-vector", //Reference to the base of the map
   });
 
   @Input()

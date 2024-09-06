@@ -20,7 +20,7 @@ import { AppLoaderComponent } from 'src/app/components/app-loader/app-loader.com
 export class MenuPage implements OnInit {
 
   constructor(private helper:Helper, private router:Router) {
-    this.planItems = this.unserializePlanItems();
+    this.planItems = this.helper.unserializePlanItems();
     this.hasKey = of(true);
   }
 
@@ -37,13 +37,16 @@ export class MenuPage implements OnInit {
       value: "New Plan"
     });
 
-    this.serializePlanItems();
+    this.helper.serializePlanItems(this.planItems);
   } 
 
   onItemDelete(deleteItem:PlanItem){
     this.planItems = this.planItems.filter((item) => item.id !== deleteItem.id);
 
-    this.serializePlanItems();
+    this.helper.serializePlanItems(this.planItems);
+    localStorage.removeItem(deleteItem.id);
+
+    this.goToItem(deleteItem.id);
   }
 
   onItemSave(saveItem:PlanItem) {
@@ -55,17 +58,7 @@ export class MenuPage implements OnInit {
       return item;
     });
 
-    this.serializePlanItems();
-  }
-
-  serializePlanItems(){
-    localStorage.setItem("PLAN_ITEMS", JSON.stringify(this.planItems));
-  }
-
-  unserializePlanItems(){
-    const planItemsContent = localStorage.getItem("PLAN_ITEMS");
-
-    return planItemsContent ? JSON.parse(planItemsContent) : [];
+    this.helper.serializePlanItems(this.planItems);
   }
 
   planItems: PlanItem[];

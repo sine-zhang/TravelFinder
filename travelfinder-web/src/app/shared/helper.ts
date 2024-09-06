@@ -1,4 +1,5 @@
 import {Injectable} from "@angular/core";
+import { PlanItem } from "../components/plan-item/plan-item.component";
 
 @Injectable({
     providedIn: 'root'
@@ -27,5 +28,46 @@ export class Helper {
         return false;
     }
     return true;
-}
+  };
+
+  serializePlanItems = (planItems:PlanItem[]) => {
+    localStorage.setItem("PLAN_ITEMS", JSON.stringify(planItems));
+  }
+
+  unserializePlanItems = ():PlanItem[] => {
+    const planItemsContent = localStorage.getItem("PLAN_ITEMS");
+
+    return planItemsContent ? JSON.parse(planItemsContent) : [];
+  }
+
+  getIcon = (category:string) => {
+    var icons  = new Map<string, string>()
+    let iconName:string | undefined = "place.svg";
+
+    icons.set("hotel", "hotel.svg");
+    icons.set("bar", "bar.svg");
+    icons.set("store", "store.svg");
+    icons.set("night_club", "night_club.svg");
+    icons.set("library", "library.svg");
+    icons.set("cafe", "cafe.svg");
+    icons.set("landmark", "landmark.svg");
+    icons.set("museum", "museum.svg");
+    icons.set("gallery", "gallery.svg");
+    icons.set("restaurant", "restaurant.svg");
+    icons.set("park", "park.svg");
+
+    icons.forEach((icon, name) => {
+      if (category?.toLowerCase().indexOf(name.toLowerCase()) !== -1) {
+        iconName = icon;
+      }
+    })
+
+    for (var icon in icons) {
+
+    }
+
+    return `/assets/icon/${iconName}`;
+
+  }
+  
 }

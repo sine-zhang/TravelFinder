@@ -2,12 +2,7 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { environment } from 'src/environments/environment';
 import { Helper } from '../shared/helper';
-
-export interface MessageBody{
-  messages: Message[],
-  system:string,
-  tokenUsed:number
-}
+import GraphicsLayer from '@arcgis/core/layers/GraphicsLayer';
 
 export interface Message {
   content: string;
@@ -24,6 +19,38 @@ export class ApiService {
 
   constructor(private helper:Helper) { }
 
+  async getHintByMessages(message: Message, lat: number, lng: number) {
+    const fullMessage = {
+      SystemId: "",
+      Messages: [message],
+      Latitude: lat,
+      Longitude: lng
+    };
+
+    const response = await fetch(`${environment.API_URL}/chat/hint`, {
+      method: "POST",
+      cache: "no-cache",
+      headers: {
+          "Content-Type": "application/json",
+      },
+      body: JSON.stringify(fullMessage),
+    });
+
+    if(!response || !response.body)return;
+
+    const reader = response.body.getReader();
+    const {value, done} = await reader.read();
+
+    const responseBody = new TextDecoder().decode(value) as any;
+
+    const result = JSON.parse(responseBody);
+    if (result.Choices?.length > 0) {
+      return result.Choices[0].Message.content;
+    }
+
+    return null;
+  }
+  
   async getCommandByMessages(messages: Message[], lat: number, lng: number){
     const fullMessage = {
       SystemId: "gis_helper",
@@ -134,10 +161,24 @@ export interface Message {
 export interface MessageBody{
   messages: Message[],
   system:string,
-  tokenUsed:number
+  tokenUsed:number,
+  graphicsJSON: any[],
+  latitude: any,
+  longitude: any
 }
 
 export interface DoneMessage {
   content:string|null
   tokenLength: number
+}
+
+export interface Place {
+  name: string,
+  formattedAddress: string,
+  primaryType:string,
+  location: {
+    latitude: any,
+    longitude: any
+  },
+  reason: string
 }

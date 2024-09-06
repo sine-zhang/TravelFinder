@@ -19,6 +19,16 @@ export const routes: Routes = [
           }
         ]
       },
+      {
+        path:'detail',
+        children:[
+          {
+            path: '**',
+            data: {reuse:false},
+            loadComponent: () => import('./components/plan-detail/plan-detail.component').then(m => m.PlanDetailComponent)
+          }
+        ]
+      }
     ]
 
   }
