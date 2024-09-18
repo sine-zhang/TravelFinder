@@ -84,6 +84,8 @@ namespace TravelfinderAPI.GmpGis
 
             var placeResult = JsonConvert.DeserializeObject<PlaceResult>(responseBody);
 
+            _latitude = latitude;
+            _longitude = longitude;
             _placeResult = placeResult;
 
             return _placeResult;

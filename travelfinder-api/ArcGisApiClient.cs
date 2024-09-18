@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.WebUtilities;
 using Newtonsoft.Json;
 using System.Security.Cryptography.X509Certificates;
 using System.Xml.Linq;
+using TravelfinderAPI.GmpGis;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace TravelfinderAPI
 {
@@ -31,7 +33,7 @@ namespace TravelfinderAPI
             return client;
         }
 
-        public async Task<FeatureResult> Query(string geometry, string where="1=1", int distance = 5000, int resultOffset=0, int resultRecordCount=50)
+        public async Task<FeatureResult> Query(string geometry, int sr=4326, string where="1=1", int distance = 5000, int resultOffset=0, int resultRecordCount=50)
         {
             var parameters = new Dictionary<string, string?>
             {
@@ -42,11 +44,12 @@ namespace TravelfinderAPI
                 ["resultOffset"] = resultOffset.ToString(),
                 ["resultRecordCount"] = resultRecordCount.ToString(),
                 ["where"] = where,
+                ["geometry"] = geometry,
                 ["geometryType"] = "esriGeometryPoint",
                 ["spatialRel"] = "esriSpatialRelIntersects",
                 ["distance"] = distance.ToString(),
                 ["units"] = "esriSRUnit_Meter",
-                ["outSR"] = "4326",
+                ["outSR"] = sr.ToString(),
             };
 
             var httpClient = GetNewClient(true);
@@ -92,6 +95,29 @@ namespace TravelfinderAPI
             return applyEditResult;
         }
 
+        public async Task<GmpGis.PlaceResult> NearPoint(double latitude, double longitude, int radius, int pageSize)
+        {
+            var newCoord = new Coordinates(latitude, longitude);
+            var oldCoord = new Coordinates(_latitude, _longitude);
+
+            var distance = oldCoord.DistanceTo(newCoord, UnitOfLength.Kilometers);
+
+            if (distance <= 999 && _placeResult != null)
+            {
+                return _placeResult;
+            }
+
+            var featureResult = await Query($"{longitude},{latitude}", 4326, "1=1", 5000, 0, pageSize);
+
+            var places = featureResult.Features.Select(feature => feature.ToPlace());
+
+            _latitude = latitude;
+            _longitude = longitude;
+            _placeResult = new GmpGis.PlaceResult() { Places = places.ToArray() }; ;
+
+            return _placeResult;
+        }
+
         public async Task<PlaceResult> NearPoint(double x, double y, int radius, int[] categoryIds, int pageSize)
         {
             var parameters = new Dictionary<string, string?>
@@ -126,6 +152,10 @@ namespace TravelfinderAPI
         private readonly string _apiKey;
         private readonly bool _enableProxy;
         private string _pointLayerURL;
+
+        private double _latitude;
+        private double _longitude;
+        private GmpGis.PlaceResult _placeResult;
     }
 
     public class FeatureResult
@@ -137,6 +167,21 @@ namespace TravelfinderAPI
     {
         public FeatureAttributes Attributes { get; set; }
         public FeatureGeometry Geometry { get; set; }
+
+        public GmpGis.Place ToPlace()
+        {
+            return new GmpGis.Place()
+            {
+                Name = this.Attributes.Name,
+                PrimaryType = this.Attributes.Category,
+                FormattedAddress = this.Attributes.FormattedAddress,
+                Location = new GmpGis.Location()
+                {
+                    Latitude = this.Geometry.Latitude,
+                    Longitude = this.Geometry.Longitude
+                }
+            };
+        }
     }
 
     public class FeatureGeometry
@@ -154,6 +199,7 @@ namespace TravelfinderAPI
         public string Name { get; set; }
         public string Category { get; set; }
         public string Description { get; set; }
+        public string FormattedAddress { get; set; }
     }
 
     public class ApplyEditRequest

@@ -66,7 +66,12 @@ namespace TravelfinderAPI.Controllers
                 _openAiKey = apiKey;
             }
 
-            var placeResult = await _gmpGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 1000, "en-us", 20);
+            var placeResult1 = await _gmpGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 1000, "en-us", 20);
+
+            var placeResult2 = await _arcGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 1000, 20);
+
+            var placeResult = new GmpGis.PlaceResult();
+            placeResult.Places = placeResult1.Places.Union(placeResult2.Places).ToArray();
 
             var messages = messageRequest.Messages;
             var systemMessage = _promotTemplate.FirstOrDefault(x => x.Id == messageRequest.SystemId);
@@ -105,10 +110,13 @@ namespace TravelfinderAPI.Controllers
 
             var target = JsonConvert.DeserializeObject<Plan[]>(message.Content);
 
+            var travelLocationJson = JsonConvert.SerializeObject(placeResult);
+
+            systemMessage.Promot = systemMessage.Promot.Replace("__TRAVEL_LOCATIONS__", travelLocationJson);
+
             var hint = JsonConvert.SerializeObject(new Hint()
             {
-                Source = placeResult.Places,
-                Target = target
+                Plans = target
             });
 
             var messages = new Message[]

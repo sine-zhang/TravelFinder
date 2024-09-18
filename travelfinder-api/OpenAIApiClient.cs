@@ -44,7 +44,7 @@ namespace TravelfinderAPI
             }
 
             _apiKey = apiKey;
-            _httpClient.BaseAddress = new Uri("https://travelfinder.openai.azure.com/openai/deployments/GisHelper/");
+            _httpClient.BaseAddress = new Uri("https://travelfinder.openai.azure.com/openai/deployments/gpt-4-2/");
 
             _arcGisApiClient = arcGisApiClient;
         }
@@ -248,7 +248,7 @@ namespace TravelfinderAPI
                                 where = $"Category LIKE '%{category_type}%'";
                             }
 
-                            var featureResult = await _arcGisApiClient.Query(geometry, where, 5000, 0, record_count);
+                            var featureResult = await _arcGisApiClient.Query(geometry, 4326, where, 5000, 0, record_count);
 
                             choice.Message.Content = JsonConvert.SerializeObject(featureResult);
                             break;
@@ -334,8 +334,7 @@ namespace TravelfinderAPI
 
     public class Hint
     {
-        public GmpGis.Place[] Source { get; set; }
-        public Plan[] Target { get; set; }
+        public Plan[] Plans { get; set; }
     }
 
 }
