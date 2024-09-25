@@ -50,6 +50,7 @@ namespace TravelfinderAPI
                 ["distance"] = distance.ToString(),
                 ["units"] = "esriSRUnit_Meter",
                 ["outSR"] = sr.ToString(),
+                ["inSR"] = sr.ToString()
             };
 
             var httpClient = GetNewClient(true);
