@@ -57,6 +57,8 @@ namespace TravelfinderAPI.Controllers
         [Route("StreamCommand")]
         public async Task StreamCommand([FromBody] MessageRequest messageRequest)
         {
+            await HttpContext.SSEInitAsync();
+
             var apiKey = Request.Headers["Joi-ApiKey"];
 
             if (!string.IsNullOrEmpty(apiKey))
@@ -123,20 +125,11 @@ namespace TravelfinderAPI.Controllers
                     else
                     {
                         obj = JsonConvert.DeserializeObject<Completion>(data);
-
-                        Array.ForEach(obj.Choices, (item) =>
-                        {
-                            if (string.IsNullOrWhiteSpace(item.Delta.Content)) return;
-
-                            completeMessage += item.Delta.Content;
-                        });
-
                     }
 
-                    var serializerSettings = new JsonSerializerSettings();
-                    serializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
-                    data = JsonConvert.SerializeObject(obj, serializerSettings);
-                    
+                    data = string.Join("", obj.Choices?.Select(choice => choice.Delta?.Content));
+                    data = data.Replace("\n", "");
+
                     await HttpContext.SSESendDataAsync(data);
                 }
             }

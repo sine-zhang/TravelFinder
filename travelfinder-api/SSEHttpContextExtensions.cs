@@ -12,7 +12,7 @@
     public static async Task SSESendDataAsync(this HttpContext ctx, string data)
     {
         foreach (var line in data.Split('\n'))
-            await ctx.Response.WriteAsync(line + "\n");
+            await ctx.Response.WriteAsync(line);
 
         await ctx.Response.Body.FlushAsync();
     }
