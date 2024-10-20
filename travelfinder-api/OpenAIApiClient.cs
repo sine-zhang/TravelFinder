@@ -5,6 +5,7 @@ using TravelfinderAPI.Functions;
 using Newtonsoft.Json;
 using System.Reflection.Metadata.Ecma335;
 using System;
+using System.IO.Compression;
 using System.Reflection;
 using System.Text;
 
@@ -96,6 +97,36 @@ namespace TravelfinderAPI
             return responseBody;
         }
 
+        public async Task<Stream> SendStreamCommand(CommandOptions options)
+        {
+            var requestBody = new
+            {
+                messages = options.Messages,
+                stream = true
+            };
+            
+            var requestMessage = new HttpRequestMessage(HttpMethod.Post, "chat/completions?api-version=2023-03-15-preview")
+            {
+                Content = new StringContent(JsonConvert.SerializeObject(requestBody),Encoding.UTF8,"application/json")
+            };
+            
+            requestMessage.Headers.Add("api-key", _apiKey);
+            var responseStream = Stream.Null;
+            try
+            {
+                // HttpCompletionOption.ResponseHeadersRead is important, otherwise it won't stream
+                var response = await _httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead);
+                response.EnsureSuccessStatusCode();
+                responseStream = await response.Content.ReadAsStreamAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
+
+            return responseStream;
+        }
+        
         public async Task<StaticCompletion> SendCommands(Message[] messages, double latitude, double longitude, string apiKey = "")
         {
             var requestBody = new
@@ -335,6 +366,13 @@ namespace TravelfinderAPI
     public class Hint
     {
         public Plan[] Plans { get; set; }
+    }
+
+    public class CommandOptions
+    {
+        public Message[] Messages { get; set; }
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
     }
 
 }

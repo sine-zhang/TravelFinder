@@ -53,6 +53,95 @@ namespace TravelfinderAPI.Controllers
             }
 
         }
+        [HttpPost]
+        [Route("StreamCommand")]
+        public async Task StreamCommand([FromBody] MessageRequest messageRequest)
+        {
+            var apiKey = Request.Headers["Joi-ApiKey"];
+
+            if (!string.IsNullOrEmpty(apiKey))
+            {
+                _openAiKey = apiKey;
+            }
+
+            var placeResult1 = await _gmpGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 1000, "en-us", 20);
+
+            var placeResult2 = await _arcGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 1000, 20);
+
+            var placeResult = new GmpGis.PlaceResult();
+            placeResult.Places = placeResult1.Places.Union(placeResult2.Places).ToArray();
+
+            var messages = messageRequest.Messages;
+            var systemMessage = _promotTemplate.FirstOrDefault(x => x.Id == messageRequest.SystemId);
+
+            var promot = systemMessage == null ? "You are ChatGPT, a large language model trained by OpenAI. Follow the user's instructions carefully. Respond using markdown format." : systemMessage.Promot;
+
+            messages = messages.Prepend(new Message()
+                {
+                    Role = "assistant",
+                    Content = "Sure, please provide further description."
+                }).Prepend(new Message()
+                {
+                    Role = "user",
+                    Content = "These are alternative locations: " + JsonConvert.SerializeObject(placeResult)
+                }).Prepend(new Message()
+                {
+                    Role = "system",
+                    Content = promot
+                })
+                .ToList();
+            var commandOptions = new CommandOptions()
+            {
+                Messages = messages.ToArray()
+            };
+            
+            var responseStream = await _openAIApiClient.SendStreamCommand(commandOptions);
+            string completeMessage = string.Empty;
+
+            using (var reader = new StreamReader(responseStream))
+            {
+                while (!reader.EndOfStream)
+                {
+                    string data = reader.ReadLine();
+
+                    data = data.Replace("data: ", "").Trim();
+
+                    if (string.IsNullOrWhiteSpace(data)) continue;
+
+                    Completion obj = new Completion();
+                    
+                    if(data == "[DONE]")
+                    {
+                        obj.Choices = new Choice[]
+                        {
+                            new Choice()
+                            {
+                                FinishReason = "stop",
+                            }   
+                        };
+                    }
+                    else
+                    {
+                        obj = JsonConvert.DeserializeObject<Completion>(data);
+
+                        Array.ForEach(obj.Choices, (item) =>
+                        {
+                            if (string.IsNullOrWhiteSpace(item.Delta.Content)) return;
+
+                            completeMessage += item.Delta.Content;
+                        });
+
+                    }
+
+                    var serializerSettings = new JsonSerializerSettings();
+                    serializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
+                    data = JsonConvert.SerializeObject(obj, serializerSettings);
+                    
+                    await HttpContext.SSESendDataAsync(data);
+                }
+            }
+        
+        }
 
         [HttpPost]
         [Route("Command")]
