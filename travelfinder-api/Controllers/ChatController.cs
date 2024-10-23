@@ -188,7 +188,7 @@ namespace TravelfinderAPI.Controllers
             var placeResult = await _gmpGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 1000, "en-us", 20);
 
             var message = messageRequest.Messages.First();
-            var systemMessage = _promotTemplate.First(template => template.Id == "gis_helper_2");
+            var systemMessage = _promotTemplate.First(template => template.Id == "gis_helper_3");
 
             var target = JsonConvert.DeserializeObject<Plan[]>(message.Content);
 
