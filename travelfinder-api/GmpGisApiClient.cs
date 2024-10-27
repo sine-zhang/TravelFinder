@@ -54,39 +54,48 @@ namespace TravelfinderAPI.GmpGis
                 return _placeResult;
             }
 
-            var requestBody = new
+            try
             {
-                includedTypes = new string[] { "park", "restaurant", "art_gallery", "museum", "historical_landmark", "cafe", "bar", "library", "night_club", "store", "supermarket", "jewelry_store" },
-                languageCode = languageCode,
-                maxResultCount = pageSize,
-                locationRestriction = new
+                var requestBody = new
                 {
-                    circle = new {
-                        center = new { latitude = latitude, longitude = longitude },
-                        radius = radius
+                    includedTypes = new string[] { "park", "restaurant", "art_gallery", "museum", "historical_landmark", "cafe", "bar", "library", "night_club", "store", "supermarket", "jewelry_store" },
+                    languageCode = languageCode,
+                    maxResultCount = pageSize,
+                    locationRestriction = new
+                    {
+                        circle = new
+                        {
+                            center = new { latitude = latitude, longitude = longitude },
+                            radius = radius
+                        }
                     }
-                }
-            };
+                };
 
-            var httpClient = GetNewClient(true);
+                var httpClient = GetNewClient(true);
 
-            var requestMessage = new HttpRequestMessage(HttpMethod.Post, "searchNearby")
+                var requestMessage = new HttpRequestMessage(HttpMethod.Post, "searchNearby")
+                {
+                    Content = JsonContent.Create(requestBody)
+                };
+
+                httpClient.DefaultRequestHeaders.Add("X-Goog-Api-Key", _apiKey);
+                httpClient.DefaultRequestHeaders.Add("X-Goog-FieldMask", "places.displayName,places.formattedAddress,places.primaryType,places.rating,places.location,places.id");
+
+                var response = await httpClient.PostAsync("https://places.googleapis.com/v1/places:searchNearby", JsonContent.Create(requestBody));
+                response.EnsureSuccessStatusCode();
+                var responseBody = await response.Content.ReadAsStringAsync();
+
+                var placeResult = JsonConvert.DeserializeObject<PlaceResult>(responseBody);
+                _placeResult = placeResult;
+            }
+            catch(Exception ex)
             {
-                Content = JsonContent.Create(requestBody)
-            };
+                var dd = ex.ToString();
+            }
 
-            httpClient.DefaultRequestHeaders.Add("X-Goog-Api-Key", _apiKey);
-            httpClient.DefaultRequestHeaders.Add("X-Goog-FieldMask", "places.displayName,places.formattedAddress,places.primaryType,places.rating,places.location,places.id");
-
-            var response = await httpClient.PostAsync("https://places.googleapis.com/v1/places:searchNearby", JsonContent.Create(requestBody));
-            response.EnsureSuccessStatusCode();
-            var responseBody = await response.Content.ReadAsStringAsync();
-
-            var placeResult = JsonConvert.DeserializeObject<PlaceResult>(responseBody);
 
             _latitude = latitude;
             _longitude = longitude;
-            _placeResult = placeResult;
 
             return _placeResult;
         }
