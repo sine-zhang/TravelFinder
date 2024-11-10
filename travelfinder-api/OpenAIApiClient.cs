@@ -17,11 +17,12 @@ namespace TravelfinderAPI
         private readonly HttpClient _httpClient;
         private readonly string _apiKey;
         private readonly ArcGisApiClient _arcGisApiClient;
+        private readonly PromotTemplate[] _promotTemplates;
 
         public double Latitude { get; set; }
         public double Longitude { get; set; }
 
-        public OpenAIApiClient(string apiKey, bool enableProxy, ArcGisApiClient arcGisApiClient)
+        public OpenAIApiClient(string apiKey, bool enableProxy, ArcGisApiClient arcGisApiClient, PromotTemplate[] promotTemplates)
         {
             if(enableProxy)
             {
@@ -48,6 +49,7 @@ namespace TravelfinderAPI
             _httpClient.BaseAddress = new Uri("https://travelfinder.openai.azure.com/openai/deployments/gpt-4-2/");
 
             _arcGisApiClient = arcGisApiClient;
+            _promotTemplates = promotTemplates;
         }
 
         public async Task<Stream> SendPromptStream(string prompt, string apiKey = "", string model = "gpt-3.5-turbo")
@@ -129,56 +131,17 @@ namespace TravelfinderAPI
         
         public async Task<StaticCompletion> SendCommands(Message[] messages, double latitude, double longitude, string apiKey = "")
         {
+            var areaSuggest = await StartFromAreaSuggest(messages);
+
+            if (string.IsNullOrEmpty(areaSuggest.Refinement))
+            {
+
+            }
+
             var requestBody = new
             {
                 messages = messages,
-                stream = false,
-/*             
-                tools = new Tool[] {
-                    
-                    new Tool()
-                    {
-                        Function = new Function()
-                        {
-                            Name = "QueryFeature",
-                            Description = "return TravelPlace created by user.",
-                            Parameters = new Parameters()
-                            {
-                                Properties = new Dictionary<string, Property>()
-                                {
-                                    {
-                                        "record_count", new Property() { Type = "string", Description = "the count of TravelPlace records should be included." }
-                                    },
-                                    {
-                                        "category_type", new Property() { Type = "string", Description = "the category of the TravelPlace record."}
-                                    }
-                                },
-                                Required = new List<string>(){ "record_count" }
-                            }
-
-                        }
-                    },
-                    new Tool()
-                    {
-                        Function = new Function()
-                        {
-                            Name = "GeocodeAddress",
-                            Description = "get latitude and longitude based on the address",
-                            Parameters = new Parameters()
-                            {
-                                Properties = new Dictionary<string, Property>()
-                                {
-                                    {
-                                        "address", new Property() { Type = "string", Description = "the address that need to be geocoded" }
-                                    }
-                                },
-                                Required = new List<string>(){"address"}
-                            }
-                        }
-                    }
-
-                }
-*/
+                stream = false
             };
 
             var requestMessage = new HttpRequestMessage(HttpMethod.Post, "chat/completions?api-version=2023-03-15-preview")
@@ -243,7 +206,59 @@ namespace TravelfinderAPI
             return responseBody;
         }
 
-        
+        public async Task<AreaSuggest> StartFromAreaSuggest(Message[] messages, string systemId = "start_from_area_suggest")
+        {
+            var areaSuggest = new AreaSuggest();
+            var systemMessage = _promotTemplates.FirstOrDefault(x => x.Id == systemId);
+
+            var requestBody = new
+            {
+                messages = messages,
+                stream = false,
+                tools = systemMessage.Tools
+            };
+
+            var requestMessage = new HttpRequestMessage(HttpMethod.Post, "chat/completions?api-version=2023-03-15-preview")
+            {
+                Content = new StringContent(JsonConvert.SerializeObject(requestBody), Encoding.UTF8, "application/json")
+            };
+
+            requestMessage.Headers.Add("api-key", _apiKey);
+
+            Debug.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(requestBody));
+
+            StaticCompletion completion = new StaticCompletion();
+            string responseBody = null;
+            try
+            {
+
+                var response = await _httpClient.SendAsync(requestMessage);
+                response.EnsureSuccessStatusCode();
+                responseBody = await response.Content.ReadAsStringAsync();
+
+                completion = JsonConvert.DeserializeObject<StaticCompletion>(responseBody);
+
+                var staticChoice = completion.Choices.FirstOrDefault();
+                
+                if (Utils.IsValidJson(staticChoice.Message.Content))
+                {
+                    areaSuggest = JsonConvert.DeserializeObject<AreaSuggest>(staticChoice.Message.Content);
+                }
+                else
+                {
+                    areaSuggest.Refinement = staticChoice.Message.Content;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
+
+            return areaSuggest;
+        }
+
+
+
         private async Task<StaticCompletion> ExecuteFunction(StaticCompletion staticCompletion, double latitude, double longitude)
         {
             foreach(var choice in staticCompletion.Choices)
@@ -350,6 +365,8 @@ namespace TravelfinderAPI
     {
         public string Id { get; set; }
         public string Promot { get; set; }
+
+        public Tool[] Tools { get; set; }
     }
 
     public class Plan
@@ -373,6 +390,22 @@ namespace TravelfinderAPI
         public Message[] Messages { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }
+    }
+
+    public class AreaSuggest
+    {
+        [JsonProperty("start_categories")]
+        public string[] StartCategories { get; set; }
+        [JsonProperty("start_name")]
+        public string StartName { get; set; }
+        [JsonProperty("go_through_areas")]
+        public string[] GoThroughAreas { get; set; }
+        [JsonProperty("go_through_count")]
+        public int GoThroughCount { get; set; }
+        [JsonProperty("price_level")]
+        public string[] PriceLevel { get; set; }
+
+        public string Refinement { get; set; }
     }
 
 }

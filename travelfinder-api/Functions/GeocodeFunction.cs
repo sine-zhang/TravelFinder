@@ -78,8 +78,20 @@ namespace TravelfinderAPI.Functions
         [JsonProperty("type")]
         public string Type { get; set; }
 
+        [JsonProperty("items")]
+        public PropertyItems Items { get; set; }
+
         [JsonProperty("description")]
         public string Description { get; set; }
+    }
+
+    public class PropertyItems
+    {
+        [JsonProperty("type")]
+        public string Type { get; set; }
+
+        [JsonProperty("enum")]
+        public string[] Enum { get; set; }
     }
 
     public class FunctionData

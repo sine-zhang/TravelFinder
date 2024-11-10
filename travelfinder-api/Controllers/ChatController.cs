@@ -32,7 +32,7 @@ namespace TravelfinderAPI.Controllers
             _gmpGisApiClient = gmpGisApiClient;
             _arcGisApiClient = arcGisApiClient;
 
-            _openAIApiClient = new OpenAIApiClient(_openAiKey, _enableProxy, arcGisApiClient);
+            _openAIApiClient = new OpenAIApiClient(_openAiKey, _enableProxy, arcGisApiClient, _promotTemplate);
         }
 
         [HttpGet]
