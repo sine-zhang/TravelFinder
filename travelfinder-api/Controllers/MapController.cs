@@ -1,6 +1,7 @@
 ﻿using TravelfinderAPI.GmpGis;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using TravelfinderAPI.Functions;
 
 namespace TravelfinderAPI.Controllers
 {
@@ -26,7 +27,7 @@ namespace TravelfinderAPI.Controllers
         {
             var apiClient = new GmpGisApiClient(_openAiKey, _enableProxy);
 
-            var result = await apiClient.NearPoint(latitude, longitude, radius, languageCode, pageSize);
+            var result = await apiClient.NearPoint(latitude, longitude, radius, languageCode, pageSize, new string[] { });
 
             return Ok(JsonConvert.SerializeObject(result));
         }
@@ -38,6 +39,18 @@ namespace TravelfinderAPI.Controllers
             var apiClient = new GmpGisApiClient(_openAiKey, _enableProxy);
 
             var result = await apiClient.Geocode(address);
+
+            return Ok(JsonConvert.SerializeObject(result));
+        }
+
+
+        [HttpGet]
+        [Route("ReverseGeocode")]
+        public async Task<ActionResult> ReverseGeocode(double latitude, double longitude)
+        {
+            var apiClient = new GmpGisApiClient(_openAiKey, _enableProxy);
+
+            var result = await apiClient.ReverseGeocode(latitude, longitude);
 
             return Ok(JsonConvert.SerializeObject(result));
         }

@@ -8,6 +8,8 @@ using System;
 using System.IO.Compression;
 using System.Reflection;
 using System.Text;
+using TravelfinderAPI.GmpGis;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace TravelfinderAPI
 {
@@ -17,12 +19,13 @@ namespace TravelfinderAPI
         private readonly HttpClient _httpClient;
         private readonly string _apiKey;
         private readonly ArcGisApiClient _arcGisApiClient;
-        private readonly PromotTemplate[] _promotTemplates;
+        private readonly GmpGisApiClient _gmpGisApiClient;
+        private readonly Dictionary<string, string> _promotTemplates;
 
         public double Latitude { get; set; }
         public double Longitude { get; set; }
 
-        public OpenAIApiClient(string apiKey, bool enableProxy, ArcGisApiClient arcGisApiClient, PromotTemplate[] promotTemplates)
+        public OpenAIApiClient(string apiKey, bool enableProxy, ArcGisApiClient arcGisApiClient, Dictionary<string,string> promotTemplates, GmpGisApiClient gmpGisApiClient)
         {
             if(enableProxy)
             {
@@ -50,6 +53,7 @@ namespace TravelfinderAPI
 
             _arcGisApiClient = arcGisApiClient;
             _promotTemplates = promotTemplates;
+            _gmpGisApiClient = gmpGisApiClient;
         }
 
         public async Task<Stream> SendPromptStream(string prompt, string apiKey = "", string model = "gpt-3.5-turbo")
@@ -104,14 +108,17 @@ namespace TravelfinderAPI
             var requestBody = new
             {
                 messages = options.Messages,
-                stream = true
+                stream = true,
+                tools = options.Tools
             };
             
             var requestMessage = new HttpRequestMessage(HttpMethod.Post, "chat/completions?api-version=2023-03-15-preview")
             {
                 Content = new StringContent(JsonConvert.SerializeObject(requestBody),Encoding.UTF8,"application/json")
             };
-            
+
+            Debug.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(requestBody));
+
             requestMessage.Headers.Add("api-key", _apiKey);
             var responseStream = Stream.Null;
             try
@@ -131,13 +138,6 @@ namespace TravelfinderAPI
         
         public async Task<StaticCompletion> SendCommands(Message[] messages, double latitude, double longitude, string apiKey = "")
         {
-            var areaSuggest = await StartFromAreaSuggest(messages);
-
-            if (string.IsNullOrEmpty(areaSuggest.Refinement))
-            {
-
-            }
-
             var requestBody = new
             {
                 messages = messages,
@@ -206,14 +206,27 @@ namespace TravelfinderAPI
             return responseBody;
         }
 
-        public async Task<AreaSuggest> StartFromAreaSuggest(Message[] messages, string systemId = "start_from_area_suggest")
+        public async Task<PlanInfo> GetPlanInfo(MessageRequest messageRequest, string systemId = "get_plan_info")
         {
-            var areaSuggest = new AreaSuggest();
-            var systemMessage = _promotTemplates.FirstOrDefault(x => x.Id == systemId);
+            IMemoryCache cache = new MemoryCache(new MemoryCacheOptions());
+
+            var planInfo = cache.Get<PlanInfo>(messageRequest.RequestId);
+
+            if (planInfo != null)
+            {
+                return planInfo;
+            }
+
+            var systemMessage = _promotTemplates.First(x => x.Id == systemId);
+
+            var geocodedResult = await _gmpGisApiClient.ReverseGeocode(messageRequest.Latitude, messageRequest.Longitude);
+            var geocodedArea = geocodedResult.Results.Select(result => result.FormattedAddress).FirstOrDefault();
+            systemMessage.Promot = systemMessage.Promot.Replace("__AREA__", geocodedArea ?? "N/A");
+            var allMessages = messageRequest.Messages.Prepend(new Message() { Role = "system", Content = systemMessage.Promot }).ToList();
 
             var requestBody = new
             {
-                messages = messages,
+                messages = allMessages.ToArray(),
                 stream = false,
                 tools = systemMessage.Tools
             };
@@ -231,7 +244,6 @@ namespace TravelfinderAPI
             string responseBody = null;
             try
             {
-
                 var response = await _httpClient.SendAsync(requestMessage);
                 response.EnsureSuccessStatusCode();
                 responseBody = await response.Content.ReadAsStringAsync();
@@ -240,13 +252,18 @@ namespace TravelfinderAPI
 
                 var staticChoice = completion.Choices.FirstOrDefault();
                 
-                if (Utils.IsValidJson(staticChoice.Message.Content))
+                if (staticChoice.Message.ToolCalls?.Length > 0)
                 {
-                    areaSuggest = JsonConvert.DeserializeObject<AreaSuggest>(staticChoice.Message.Content);
+                    var toolCall = staticChoice.Message.ToolCalls.FirstOrDefault();
+
+                    planInfo = JsonConvert.DeserializeObject<PlanInfo>(toolCall.Function.ArgumentsContent);
+
+                    cache.Set(messageRequest.RequestId, planInfo);
                 }
-                else
+                else if (!string.IsNullOrEmpty(staticChoice.Message.Content))
                 {
-                    areaSuggest.Refinement = staticChoice.Message.Content;
+                    planInfo = new PlanInfo();
+                    planInfo.Refinement = staticChoice.Message.Content;
                 }
             }
             catch (Exception ex)
@@ -254,7 +271,7 @@ namespace TravelfinderAPI
                 Debug.WriteLine(ex.Message);
             }
 
-            return areaSuggest;
+            return planInfo;
         }
 
 
@@ -314,14 +331,23 @@ namespace TravelfinderAPI
 
         [JsonProperty("content")]
         public string Content { get; set; }
+    }
 
-        [JsonIgnore]
+    public class FunctionMessage
+    {
+        [JsonProperty("role")]
+        public string Role { get; set; }
+
+        [JsonProperty("content")]
+        public string Content { get; set; }
+
+        [JsonProperty("tool_calls")]
         public ToolCall[]? ToolCalls { get; set; }
     }
 
     public class Choice
     {
-        public Message Delta { get; set; }
+        public FunctionMessage Delta { get; set; }
         public int Index { get; set; }
         public string FinishReason { get; set; }
         public int TokenLength { get; set; }
@@ -329,7 +355,7 @@ namespace TravelfinderAPI
 
     public class StaticChoice
     {
-        public Message Message { get; set; }
+        public FunctionMessage Message { get; set; }
         public int Index { get; set; }
         public string FinishReason { get; set; }
         public int TokenLength { get; set; }
@@ -354,6 +380,7 @@ namespace TravelfinderAPI
 
     public class MessageRequest
     {
+        public string RequestId { get; set; }
         public string SystemId { get; set; }
         public List<Message> Messages { get; set; }
 
@@ -388,6 +415,7 @@ namespace TravelfinderAPI
     public class CommandOptions
     {
         public Message[] Messages { get; set; }
+        public Tool[] Tools { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }
     }
@@ -405,6 +433,21 @@ namespace TravelfinderAPI
         [JsonProperty("price_level")]
         public string[] PriceLevel { get; set; }
 
+        public string Refinement { get; set; }
+    }
+
+    public class PlanInfo
+    {
+        [JsonProperty("categories")]
+        public string[] Categories { get; set; }
+
+        [JsonProperty("budget_level")]
+        public string[] BudgetLevel { get; set; }
+
+        [JsonProperty("language")]
+        public string Language { get; set; }
+
+        [JsonProperty("refinement")]
         public string Refinement { get; set; }
     }
 

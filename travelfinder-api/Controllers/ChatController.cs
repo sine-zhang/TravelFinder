@@ -7,6 +7,8 @@ using System.IO;
 using System.Net;
 using System.Net.Http.Headers;
 using TiktokenSharp;
+using static System.Runtime.InteropServices.JavaScript.JSType;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace TravelfinderAPI.Controllers
 {
@@ -27,12 +29,12 @@ namespace TravelfinderAPI.Controllers
             _logger = logger;
             _openAiKey = configuration["OPENAI_API_KEY"];
             _enableProxy = Convert.ToBoolean(configuration["ENABLE_PROXY"]);
-            _promotTemplate = configuration.GetSection("PROMOT_TEMPLATE").Get<PromotTemplate[]>();
+            var promotTemplate = configuration.GetSection("PROMOT_TEMPLATE").Get<Dictionary<string, string>>();
 
             _gmpGisApiClient = gmpGisApiClient;
             _arcGisApiClient = arcGisApiClient;
 
-            _openAIApiClient = new OpenAIApiClient(_openAiKey, _enableProxy, arcGisApiClient, _promotTemplate);
+            _openAIApiClient = new OpenAIApiClient(_openAiKey, _enableProxy, arcGisApiClient, promotTemplate, gmpGisApiClient);
         }
 
         [HttpGet]
@@ -53,48 +55,48 @@ namespace TravelfinderAPI.Controllers
             }
 
         }
+
+        [HttpPost]
+        [Route("GetPlanInfo")]
+        public async Task<ActionResult> GetPlanInfo([FromBody] MessageRequest messageRequest)
+        {
+            var planInfo = await _openAIApiClient.GetPlanInfo(messageRequest);
+
+            return Ok(JsonConvert.SerializeObject(planInfo));
+        }
+
         [HttpPost]
         [Route("StreamCommand")]
         public async Task StreamCommand([FromBody] MessageRequest messageRequest)
         {
             await HttpContext.SSEInitAsync();
 
-            var apiKey = Request.Headers["Joi-ApiKey"];
+            var planInfo = await _openAIApiClient.GetPlanInfo(messageRequest);
 
-            if (!string.IsNullOrEmpty(apiKey))
+            if (!string.IsNullOrEmpty(planInfo.Refinement))
             {
-                _openAiKey = apiKey;
+                await HttpContext.SSESendDataAsync(planInfo.Refinement);
+                return;
             }
 
-            var placeResult1 = await _gmpGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 1000, "en-us", 20);
+            var gmpResult = await _gmpGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 5000, planInfo.Language, 20, planInfo.Categories);
+            var usrResult = await _arcGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 5000, 20);
 
-            var placeResult2 = await _arcGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 1000, 20);
-
-            var placeResult = new GmpGis.PlaceResult();
-            placeResult.Places = placeResult1.Places.Union(placeResult2.Places).ToArray();
+            var placeResult = new GmpGis.PlaceResult() { Places = gmpResult.Places.Union(usrResult.Places).ToArray() };
 
             var messages = messageRequest.Messages;
-            var systemMessage = _promotTemplate.FirstOrDefault(x => x.Id == messageRequest.SystemId);
-
-            var promot = systemMessage == null ? "You are ChatGPT, a large language model trained by OpenAI. Follow the user's instructions carefully. Respond using markdown format." : systemMessage.Promot;
+            var systemMessage = _promotTemplate.First(x => x.Id == "get_plan_result");
 
             messages = messages.Prepend(new Message()
-                {
-                    Role = "assistant",
-                    Content = "Sure, please provide further description."
-                }).Prepend(new Message()
-                {
-                    Role = "user",
-                    Content = "These are alternative locations: " + JsonConvert.SerializeObject(placeResult)
-                }).Prepend(new Message()
-                {
-                    Role = "system",
-                    Content = promot
-                })
-                .ToList();
+            {
+                Role = "system",
+                Content = systemMessage.Promot.Replace("__TRAVEL_LOCATIONS__", JsonConvert.SerializeObject(placeResult))
+            }).ToList();
+
             var commandOptions = new CommandOptions()
             {
-                Messages = messages.ToArray()
+                Messages = messages.ToArray(),
+                Tools = systemMessage.Tools
             };
             
             var responseStream = await _openAIApiClient.SendStreamCommand(commandOptions);
@@ -125,9 +127,18 @@ namespace TravelfinderAPI.Controllers
                     else
                     {
                         obj = JsonConvert.DeserializeObject<Completion>(data);
+
+                        foreach (var choice in obj.Choices)
+                        {
+                            if (choice.Delta.ToolCalls != null)
+                            {
+                                var functionCall = choice.Delta.ToolCalls.First();
+                                data += functionCall.Function.ArgumentsContent;
+                            }
+
+                        }
                     }
 
-                    data = string.Join("", obj.Choices?.Select(choice => choice.Delta?.Content));
                     data = data.Replace("\n", "");
 
                     await HttpContext.SSESendDataAsync(data);
@@ -148,7 +159,7 @@ namespace TravelfinderAPI.Controllers
                 _openAiKey = apiKey;
             }
 
-            var placeResult1 = await _gmpGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 1000, "en-us", 20);
+            var placeResult1 = await _gmpGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 1000, "en-us", 20, new string[] { });
 
             var placeResult2 = await _arcGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 1000, 20);
 
@@ -185,7 +196,7 @@ namespace TravelfinderAPI.Controllers
         [Route("Hint")]
         public async Task<ActionResult> Hint([FromBody] MessageRequest messageRequest)
         {
-            var placeResult = await _gmpGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 1000, "en-us", 20);
+            var placeResult = await _gmpGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 1000, "en-us", 20, new string[] { });
 
             var message = messageRequest.Messages.First();
             var systemId = string.IsNullOrEmpty(messageRequest.SystemId) ? "gis_helper_3" : messageRequest.SystemId;

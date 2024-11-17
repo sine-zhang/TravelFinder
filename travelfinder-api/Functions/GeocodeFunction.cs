@@ -63,7 +63,7 @@ namespace TravelfinderAPI.Functions
     public class Parameters
     {
         [JsonProperty("type")]
-        public string Type { get; set; } = "object";
+        public string Type { get; set; }
 
         [JsonProperty("properties")]
         public Dictionary<string, Property> Properties { get; set; }
@@ -105,8 +105,8 @@ namespace TravelfinderAPI.Functions
 
                 if (_arguments == null)
                 {
-                    _arguments = JsonConvert.DeserializeObject<Dictionary<string, string>>(argumentsContent);
-                    argumentsContent = "";
+                    _arguments = JsonConvert.DeserializeObject<Dictionary<string, string>>(ArgumentsContent);
+                    ArgumentsContent = "";
                 }
 
                 return _arguments;
@@ -116,7 +116,7 @@ namespace TravelfinderAPI.Functions
         private Dictionary<string, string> _arguments;
 
         [JsonProperty("arguments")]
-        private string argumentsContent { get; set; }
+        public string ArgumentsContent { get; set; }
     }
 
     public class ToolCall

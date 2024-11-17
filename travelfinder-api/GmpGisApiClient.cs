@@ -29,6 +29,19 @@ namespace TravelfinderAPI.GmpGis
             return client;
         }
 
+        public async Task<GeocodeResult> ReverseGeocode(double latitude, double longitude)
+        {
+            var httpClient = GetNewClient(true);
+
+            var response = await httpClient.GetAsync($"https://maps.googleapis.com/maps/api/geocode/json?result_type=administrative_area_level_1&latlng={latitude},{longitude}&key={_apiKey}");
+            response.EnsureSuccessStatusCode();
+            var responseBody = await response.Content.ReadAsStringAsync();
+
+            var geocodeResult = JsonConvert.DeserializeObject<GeocodeResult>(responseBody);
+
+            return geocodeResult;
+        }
+
         public async Task<GeocodeResult> Geocode(string address)
         {
             var httpClient = GetNewClient(true);
@@ -42,7 +55,7 @@ namespace TravelfinderAPI.GmpGis
             return geocodeResult;
         }
 
-        public async Task<PlaceResult> NearPoint(double latitude, double longitude, int radius, string languageCode, int pageSize, bool enableCache = true)
+        public async Task<PlaceResult> NearPoint(double latitude, double longitude, int radius, string languageCode, int pageSize, string[] includeTypes, bool enableCache = true)
         {
             var newCoord = new Coordinates(latitude, longitude);
             var oldCoord = new Coordinates(_latitude, _longitude);
@@ -56,9 +69,14 @@ namespace TravelfinderAPI.GmpGis
 
             try
             {
+                if (includeTypes.Length == 0)
+                {
+                    includeTypes = new string[] { "park", "restaurant", "art_gallery", "museum", "historical_landmark", "cafe", "bar", "library", "night_club", "store", "supermarket", "jewelry_store" };
+                }
+
                 var requestBody = new
                 {
-                    includedTypes = new string[] { "park", "restaurant", "art_gallery", "museum", "historical_landmark", "cafe", "bar", "library", "night_club", "store", "supermarket", "jewelry_store" },
+                    includedTypes = includeTypes,
                     languageCode = languageCode,
                     maxResultCount = pageSize,
                     locationRestriction = new
