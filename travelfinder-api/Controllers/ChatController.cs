@@ -29,10 +29,11 @@ namespace TravelfinderAPI.Controllers
             _logger = logger;
             _openAiKey = configuration["OPENAI_API_KEY"];
             _enableProxy = Convert.ToBoolean(configuration["ENABLE_PROXY"]);
-            var promotTemplate = configuration.GetSection("PROMOT_TEMPLATE").Get<Dictionary<string, string>>();
+            var promotTemplate = configuration.GetSection("PROMOT_TEMPLATE").Get<PromotTemplate[]>();
 
             _gmpGisApiClient = gmpGisApiClient;
             _arcGisApiClient = arcGisApiClient;
+            _promotTemplate = promotTemplate;
 
             _openAIApiClient = new OpenAIApiClient(_openAiKey, _enableProxy, arcGisApiClient, promotTemplate, gmpGisApiClient);
         }
@@ -102,49 +103,65 @@ namespace TravelfinderAPI.Controllers
             var responseStream = await _openAIApiClient.SendStreamCommand(commandOptions);
             string completeMessage = string.Empty;
 
-            using (var reader = new StreamReader(responseStream))
+            try
             {
-                while (!reader.EndOfStream)
+                using (var reader = new StreamReader(responseStream))
                 {
-                    string data = reader.ReadLine();
-
-                    data = data.Replace("data: ", "").Trim();
-
-                    if (string.IsNullOrWhiteSpace(data)) continue;
-
-                    Completion obj = new Completion();
-                    
-                    if(data == "[DONE]")
+                    var choiceJson = "";
+                    while (!reader.EndOfStream)
                     {
-                        obj.Choices = new Choice[]
+                        var totalResult = "";
+                        string data = reader.ReadLine();
+
+                        data = data.Replace("data: ", "").Trim();
+
+                        if (string.IsNullOrWhiteSpace(data)) continue;
+
+                        Completion obj = new Completion();
+
+                        if (data == "[DONE]")
                         {
+                            obj.Choices = new Choice[]
+                            {
                             new Choice()
                             {
                                 FinishReason = "stop",
-                            }   
-                        };
-                    }
-                    else
-                    {
-                        obj = JsonConvert.DeserializeObject<Completion>(data);
-
-                        foreach (var choice in obj.Choices)
-                        {
-                            if (choice.Delta.ToolCalls != null)
-                            {
-                                var functionCall = choice.Delta.ToolCalls.First();
-                                data += functionCall.Function.ArgumentsContent;
                             }
-
+                            };
                         }
+                        else
+                        {
+                            obj = JsonConvert.DeserializeObject<Completion>(data);
+
+                            foreach (var choice in obj.Choices)
+                            {
+                                if (choice.Delta.ToolCalls != null)
+                                {
+                                    totalResult += string.Join("", choice.Delta.ToolCalls.Select(toolCall => toolCall.Function.ArgumentsContent));
+                                }
+                            }
+                        }
+
+                        totalResult = totalResult.Replace("\n", "");
+
+                        await HttpContext.SSESendDataAsync(totalResult);
                     }
 
-                    data = data.Replace("\n", "");
+                    /*
+                    var callChoices = JsonConvert.DeserializeObject<Choice[]>(choiceJson);
 
-                    await HttpContext.SSESendDataAsync(data);
+                    foreach (var callChoice in callChoices)
+                    {
+                        var toolCallData = callChoice.Delta.ToolCalls.Select(toolCall => toolCall.Function.ArgumentsContent);
+                        totalResult += string.Join("", toolCallData);
+                    }
+                    */
                 }
             }
-        
+            catch (Exception ex)
+            {
+                await HttpContext.SSESendDataAsync(ex.ToString());
+            }        
         }
 
         [HttpPost]

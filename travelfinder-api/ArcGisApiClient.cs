@@ -23,7 +23,7 @@ namespace TravelfinderAPI
 
             if (enableProxy)
             {
-                client = Utils.CreateProxy($"http://127.0.0.1:2084");
+                client = Utils.CreateProxy($"socks5://127.0.0.1:2085");
             }
             else
             {

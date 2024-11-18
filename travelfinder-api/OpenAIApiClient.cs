@@ -20,12 +20,12 @@ namespace TravelfinderAPI
         private readonly string _apiKey;
         private readonly ArcGisApiClient _arcGisApiClient;
         private readonly GmpGisApiClient _gmpGisApiClient;
-        private readonly Dictionary<string, string> _promotTemplates;
+        private readonly PromotTemplate[] _promotTemplates;
 
         public double Latitude { get; set; }
         public double Longitude { get; set; }
 
-        public OpenAIApiClient(string apiKey, bool enableProxy, ArcGisApiClient arcGisApiClient, Dictionary<string,string> promotTemplates, GmpGisApiClient gmpGisApiClient)
+        public OpenAIApiClient(string apiKey, bool enableProxy, ArcGisApiClient arcGisApiClient, PromotTemplate[] promotTemplates, GmpGisApiClient gmpGisApiClient)
         {
             if(enableProxy)
             {
@@ -40,6 +40,8 @@ namespace TravelfinderAPI
                 {
                     Proxy = proxy,
                 };
+
+                httpClientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
 
                 _httpClient = new HttpClient(handler: httpClientHandler, disposeHandler: true);
             }
@@ -111,10 +113,15 @@ namespace TravelfinderAPI
                 stream = true,
                 tools = options.Tools
             };
-            
+
+            var requestJson = JsonConvert.SerializeObject(requestBody, new JsonSerializerSettings
+            {
+                NullValueHandling = NullValueHandling.Ignore
+            });
+
             var requestMessage = new HttpRequestMessage(HttpMethod.Post, "chat/completions?api-version=2023-03-15-preview")
             {
-                Content = new StringContent(JsonConvert.SerializeObject(requestBody),Encoding.UTF8,"application/json")
+                Content = new StringContent(requestJson, Encoding.UTF8,"application/json")
             };
 
             Debug.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(requestBody));

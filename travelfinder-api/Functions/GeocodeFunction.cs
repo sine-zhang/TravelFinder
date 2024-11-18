@@ -1,4 +1,6 @@
 ﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.Dynamic;
 
 namespace TravelfinderAPI.Functions
 {
@@ -79,7 +81,7 @@ namespace TravelfinderAPI.Functions
         public string Type { get; set; }
 
         [JsonProperty("items")]
-        public PropertyItems Items { get; set; }
+        public Dictionary<string, PropertyItems> Items { get; set; }
 
         [JsonProperty("description")]
         public string Description { get; set; }

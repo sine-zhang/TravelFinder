@@ -21,6 +21,8 @@ namespace TravelfinderAPI
                 Proxy = proxy,
             };
 
+            httpClientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+
             var httpClient = new HttpClient(handler: httpClientHandler, disposeHandler: true);
 
             return httpClient;
