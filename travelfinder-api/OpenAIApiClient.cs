@@ -238,14 +238,19 @@ namespace TravelfinderAPI
                 tools = systemMessage.Tools
             };
 
+            var requestJson = JsonConvert.SerializeObject(requestBody, new JsonSerializerSettings
+            {
+                NullValueHandling = NullValueHandling.Ignore
+            });
+
+            Debug.WriteLine(requestJson);
+
             var requestMessage = new HttpRequestMessage(HttpMethod.Post, "chat/completions?api-version=2023-03-15-preview")
             {
-                Content = new StringContent(JsonConvert.SerializeObject(requestBody), Encoding.UTF8, "application/json")
+                Content = new StringContent(requestJson, Encoding.UTF8, "application/json")
             };
 
             requestMessage.Headers.Add("api-key", _apiKey);
-
-            Debug.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(requestBody));
 
             StaticCompletion completion = new StaticCompletion();
             string responseBody = null;

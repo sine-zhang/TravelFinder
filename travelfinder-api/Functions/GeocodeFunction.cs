@@ -70,6 +70,9 @@ namespace TravelfinderAPI.Functions
         [JsonProperty("properties")]
         public Dictionary<string, Property> Properties { get; set; }
 
+        [JsonProperty("enum")]
+        public string[] Enum { get; set; }
+
         [JsonProperty("required")]
         public List<string> Required { get; set; }
 
@@ -81,7 +84,7 @@ namespace TravelfinderAPI.Functions
         public string Type { get; set; }
 
         [JsonProperty("items")]
-        public Dictionary<string, PropertyItems> Items { get; set; }
+        public Parameters Items { get; set; }
 
         [JsonProperty("description")]
         public string Description { get; set; }
