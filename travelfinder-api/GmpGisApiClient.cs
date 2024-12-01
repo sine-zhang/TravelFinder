@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.WebUtilities;
 using Newtonsoft.Json;
+using System.Drawing.Printing;
 using System.Reflection;
 using System.Text;
 
@@ -27,6 +28,42 @@ namespace TravelfinderAPI.GmpGis
             }
 
             return client;
+        }
+
+        public async Task<PlaceResult> SearchText(string textQuery, double latitude, double longitude, int radius, string languageCode, int pageSize)
+        {
+            var httpClient = GetNewClient(true);
+
+            var requestBody = new
+            {
+                textQuery = textQuery,
+                languageCode = languageCode,
+                maxResultCount = pageSize,
+                locationBias = new
+                {
+                    circle = new
+                    {
+                        center = new { latitude = latitude, longitude = longitude },
+                        radius = radius
+                    }
+                }
+            };
+
+            var requestMessage = new HttpRequestMessage(HttpMethod.Post, "searchText")
+            {
+                Content = JsonContent.Create(requestBody)
+            };
+
+            httpClient.DefaultRequestHeaders.Add("X-Goog-Api-Key", _apiKey);
+            httpClient.DefaultRequestHeaders.Add("X-Goog-FieldMask", "places.displayName,places.formattedAddress,places.primaryType,places.rating,places.location,places.id");
+
+            var response = await httpClient.PostAsync("https://places.googleapis.com/v1/places:searchText", JsonContent.Create(requestBody));
+            response.EnsureSuccessStatusCode();
+            var responseBody = await response.Content.ReadAsStringAsync();
+
+            var placeResult = JsonConvert.DeserializeObject<PlaceResult>(responseBody);
+
+            return placeResult;
         }
 
         public async Task<GeocodeResult> ReverseGeocode(double latitude, double longitude)
@@ -71,7 +108,7 @@ namespace TravelfinderAPI.GmpGis
             {
                 if (includeTypes.Length == 0)
                 {
-                    includeTypes = new string[] { "park", "restaurant", "art_gallery", "museum", "historical_landmark", "cafe", "bar", "library", "night_club", "store", "supermarket", "jewelry_store" };
+                    includeTypes = new string[] { "park", "restaurant", "art_gallery", "museum", "historical_landmark", "cafe", "bar", "library", "night_club", "store", "jewelry_store" };
                 }
 
                 var requestBody = new

@@ -9,6 +9,8 @@ using System.Net.Http.Headers;
 using TiktokenSharp;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 using Microsoft.Extensions.Caching.Memory;
+using System.Data.Entity.Spatial;
+using System.Numerics;
 
 namespace TravelfinderAPI.Controllers
 {
@@ -72,39 +74,74 @@ namespace TravelfinderAPI.Controllers
         {
             await HttpContext.SSEInitAsync();
 
-            var planInfo = await _openAIApiClient.GetPlanInfo(messageRequest);
-
-            if (!string.IsNullOrEmpty(planInfo.Refinement))
-            {
-                await HttpContext.SSESendDataAsync(planInfo.Refinement);
-                return;
-            }
-
-            var gmpResult = await _gmpGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 5000, planInfo.Language, 20, planInfo.Categories);
-            var usrResult = await _arcGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 5000, 20);
-
-            var placeResult = new GmpGis.PlaceResult() { Places = gmpResult.Places.Union(usrResult.Places).ToArray() };
-
-            var messages = messageRequest.Messages;
-            var systemMessage = _promotTemplate.First(x => x.Id == "get_plan_result");
-
-            messages = messages.Prepend(new Message()
-            {
-                Role = "system",
-                Content = systemMessage.Promot.Replace("__TRAVEL_LOCATIONS__", JsonConvert.SerializeObject(placeResult))
-            }).ToList();
-
-            var commandOptions = new CommandOptions()
-            {
-                Messages = messages.ToArray(),
-                Tools = systemMessage.Tools
-            };
-            
-            var responseStream = await _openAIApiClient.SendStreamCommand(commandOptions);
-            string completeMessage = string.Empty;
-
             try
             {
+                var planInfo = await _openAIApiClient.GetPlanInfo(messageRequest);
+
+                if (!string.IsNullOrEmpty(planInfo.Refinement))
+                {
+                    await HttpContext.SSESendDataAsync(planInfo.Refinement);
+                    return;
+                }
+
+                var poiResult = new GmpGis.PlaceResult();
+                if (planInfo.PointOfInterests?.Length > 0)
+                {
+                    var placeList = new List<GmpGis.Place>();
+                    foreach (var pointOfInterest in planInfo.PointOfInterests)
+                    {
+                        var result = await _gmpGisApiClient.SearchText(pointOfInterest, messageRequest.Latitude, messageRequest.Longitude, 5000, planInfo.Language, 20);
+                    
+                        foreach(var place in result.Places)
+                        {
+                            placeList.Add(place);
+                        }
+                    }
+
+                    poiResult.Places = placeList.ToArray();
+
+                    var dbGeometryList = poiResult.Places.Select(place => DbGeometry.FromText($"POINT({place.Location.Longitude} {place.Location.Latitude})", 4326)).ToList();
+                    var centroid = GeometryHelper.GetCentroid(dbGeometryList);
+
+                    if (centroid != null && centroid.XCoordinate.HasValue && centroid.YCoordinate.HasValue)
+                    {
+                        messageRequest.Latitude = centroid.YCoordinate.Value;
+                        messageRequest.Longitude = centroid.XCoordinate.Value;
+                    }
+                }
+                else
+                {
+                    poiResult.Places = Array.Empty<GmpGis.Place>();
+                }
+
+                var gmpResult = await _gmpGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 5000, planInfo.Language, 20, planInfo.Categories);
+                var usrResult = await _arcGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 5000, 20);
+
+                var placeResult = new GmpGis.PlaceResult() { 
+                    Places  = poiResult.Places.Union(gmpResult.Places)
+                                              .Union(usrResult.Places)
+                                              .ToArray()
+                };
+
+                var messages = messageRequest.Messages;
+                var systemMessage = _promotTemplate.First(x => x.Id == "get_plan_result");
+
+                messages = messages.Prepend(new Message()
+                {
+                    Role = "system",
+                    Content = systemMessage.Promot.Replace("__TRAVEL_LOCATIONS__", JsonConvert.SerializeObject(placeResult))
+                }).ToList();
+
+                var commandOptions = new CommandOptions()
+                {
+                    Messages = messages.ToArray(),
+                    Tools = systemMessage.Tools
+                };
+            
+                var responseStream = await _openAIApiClient.SendStreamCommand(commandOptions);
+                string completeMessage = string.Empty;
+
+
                 using (var reader = new StreamReader(responseStream))
                 {
                     var choiceJson = "";
@@ -146,16 +183,6 @@ namespace TravelfinderAPI.Controllers
 
                         await HttpContext.SSESendDataAsync(totalResult);
                     }
-
-                    /*
-                    var callChoices = JsonConvert.DeserializeObject<Choice[]>(choiceJson);
-
-                    foreach (var callChoice in callChoices)
-                    {
-                        var toolCallData = callChoice.Delta.ToolCalls.Select(toolCall => toolCall.Function.ArgumentsContent);
-                        totalResult += string.Join("", toolCallData);
-                    }
-                    */
                 }
             }
             catch (Exception ex)

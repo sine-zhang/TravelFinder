@@ -280,6 +280,13 @@ namespace TravelfinderAPI
             }
             catch (Exception ex)
             {
+                planInfo = new PlanInfo()
+                {
+                    BudgetLevel = new string[] { "Moderate" },
+                    Language = "en-us",
+                    Categories = new string[] { "park", "restaurant", "art_gallery", "museum", "historical_landmark", "cafe", "bar", "library", "night_club", "store", "jewelry_store" }
+                };
+
                 Debug.WriteLine(ex.Message);
             }
 
@@ -450,17 +457,20 @@ namespace TravelfinderAPI
 
     public class PlanInfo
     {
-        [JsonProperty("categories")]
+        [JsonProperty("locationCategoryList")]
         public string[] Categories { get; set; }
 
         [JsonProperty("budget_level")]
         public string[] BudgetLevel { get; set; }
 
-        [JsonProperty("language")]
+        [JsonProperty("languageCode")]
         public string Language { get; set; }
 
         [JsonProperty("refinement")]
         public string Refinement { get; set; }
+
+        [JsonProperty("pointOfInterest")]
+        public string[] PointOfInterests { get; set; }
     }
 
 }
