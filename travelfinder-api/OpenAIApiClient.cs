@@ -424,6 +424,9 @@ namespace TravelfinderAPI
         public int Number { get; set; }
         public string SuggestReason { get; set; }
         public string Hint { get; set; }
+        public string PrimaryType { get; set; }
+        public int Duration { get; set; }
+        public int Day { get; set; }
     }
 
     public class Hint
