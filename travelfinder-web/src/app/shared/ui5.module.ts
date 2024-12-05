@@ -28,6 +28,9 @@ import { FormItemComponent } from "@ui5/webcomponents-ngx/main/form-item";
 import { IllustratedMessageComponent } from "@ui5/webcomponents-ngx/fiori/illustrated-message";
 import { MultiComboBoxComponent } from "@ui5/webcomponents-ngx/main/multi-combo-box";
 import { ToggleButtonComponent } from "@ui5/webcomponents-ngx/main/toggle-button";
+import { TimelineComponent } from "@ui5/webcomponents-ngx/fiori/timeline";
+import { TimelineItemComponent } from "@ui5/webcomponents-ngx/fiori/timeline-item";
+import { TimelineGroupItemComponent } from "@ui5/webcomponents-ngx/fiori/timeline-group-item";
 
 import "@ui5/webcomponents-icons/dist/AllIcons.js";
 import "@ui5/webcomponents-fiori/dist/illustrations/NoData.js";
@@ -59,7 +62,10 @@ const UI5_COMPONENTS = [
   FormItemComponent,
   IllustratedMessageComponent,
   MultiComboBoxComponent,
-  ToggleButtonComponent
+  ToggleButtonComponent,
+  TimelineComponent,
+  TimelineItemComponent,
+  TimelineGroupItemComponent,
 ]
 
 @NgModule({

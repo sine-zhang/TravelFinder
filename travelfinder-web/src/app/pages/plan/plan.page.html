@@ -14,10 +14,10 @@
   <ion-content [fullscreen]="true">
     <map [layers]="layers | async" (onReady)="onMapReady($event)" longPress (press)="onMapPress($event)"></map>
   </ion-content>
-  
+
   <div class="send-container">
     <ui5-message-strip class="md:w-3/5" design="Information" [hidden]="!errorMessage" (close)="clearError()">{{errorMessage}}</ui5-message-strip>
-    <div class="m-2 relative flexbox justify-center md:w-3/5 ">
+    <div class="m-2 relative flexbox justify-center md:w-2/4 ">
       <div class="w-full py-2 md:px-4 relative border border-gray/10 rounded-md shadow-[0_0_10px_rgba(0,0,0,0.90)] chat-background">
         <div [formGroup]="inputForm" class="inputForm">
           <ui5-textarea formControlName="prompt" class="textarea-width plan-message"

@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, Input, Output, OnInit,SimpleChanges,OnChanges } from '@angular/core';
 import { EventEmitter } from '@angular/core';
 import Point from '@arcgis/core/geometry/Point';
-import { Observable } from 'rxjs';
+import { Observable, lastValueFrom } from 'rxjs';
 import { GeocodeService } from 'src/app/services/geocode.service';
 import { IonicsModule } from 'src/app/shared/ionics.module';
 import { UI5Module } from 'src/app/shared/ui5.module';
@@ -32,6 +32,7 @@ export class PlaceDetailComponent  implements OnInit, OnChanges{
       name:"",
       category:"",
       description:"",
+      formattedAddress: "",
       location:{
         latitude: this.locationPoint.latitude,
         longitude: this.locationPoint.longitude
@@ -39,8 +40,17 @@ export class PlaceDetailComponent  implements OnInit, OnChanges{
     }
   }
 
-  onSave() {
+  async onSave() {
+    const geocodeResult = await lastValueFrom(this.geocodeResult);
+
+    this.placeDetail.formattedAddress = geocodeResult.LongLabel;
+
     this.save(this.placeDetail);
+  }
+
+  categoryChange(event:any) {
+    const categoryList:[] = event.detail.items.map((detail:any) => detail.attributes.categoryId.value);
+    this.placeDetail.category = categoryList.join(';');
   }
 
   onCancel() {
@@ -71,6 +81,7 @@ export interface PlaceDetail {
   name: string,
   category: string,
   description: string,
+  formattedAddress: string,
   location: {
     latitude: number,
     longitude: number

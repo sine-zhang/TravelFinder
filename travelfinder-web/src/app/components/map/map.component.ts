@@ -38,9 +38,8 @@ export class MapComponent implements OnInit, OnChanges {
     this.view = new MapView({
       container,
       map: this.webmap,
-      zoom: 4, // Sets zoom level based on level of detail (LOD)
-      center: [15, 65], // Sets center point of view using longitude,latitude,
-      spatialReference: { wkid: 3857 },
+      zoom: 13, // Sets zoom level based on level of detail (LOD)
+      center: [-73.954991, 42.829570], // Sets center point of view using longitude,latitude
     });
 
     return this.view.when();
@@ -80,19 +79,12 @@ export class MapComponent implements OnInit, OnChanges {
 
     if (layers) {
       layers.forEach(layer => this.webmap.add(layer));
-      this.view.goTo(layers[1].graphics.toArray(), {duration: 0, easing: "linear"});
-    } else {
-      const position = await Geolocation.getCurrentPosition();
 
-      let pt = new Point({
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude
-      });
+      const layer = layers[1] ?? layers[0];
 
-      this.view?.goTo({
-        target:pt,
-        zoom: 10
-      });
+      if (layer) {
+        this.view.goTo(layer.graphics.toArray(), {duration: 300, easing: "linear"});
+      }
     }
   }
 

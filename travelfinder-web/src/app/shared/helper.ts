@@ -44,17 +44,21 @@ export class Helper {
     var icons  = new Map<string, string>()
     let iconName:string | undefined = "place.svg";
 
-    icons.set("hotel", "hotel.svg");
-    icons.set("bar", "bar.svg");
-    icons.set("store", "store.svg");
-    icons.set("night_club", "night_club.svg");
-    icons.set("library", "library.svg");
-    icons.set("cafe", "cafe.svg");
-    icons.set("landmark", "landmark.svg");
-    icons.set("museum", "museum.svg");
+    icons.set("hotel", "hotel_pinlet.svg");
+    icons.set("bar", "bar_pinlet.svg");
+    icons.set("store", "shopping_pinlet.svg");
+    icons.set("shopping_mall", "shopping_pinlet.svg");
+    icons.set("night_club", "bar_pinlet.svg");
+    icons.set("library", "library_pinlet.svg");
+    icons.set("cafe", "cafe_pinlet.svg");
+    icons.set("landmark", "civic-bldg_pinlet.svg");
+    icons.set("museum", "museum_pinlet.svg");
     icons.set("gallery", "gallery.svg");
-    icons.set("restaurant", "restaurant.svg");
-    icons.set("park", "park.svg");
+    icons.set("restaurant", "restaurant_pinlet.svg");
+    icons.set("bakery", "restaurant_pinlet.svg");
+    icons.set("park", "tree_pinlet.svg");
+    icons.set("school", "school_pinlet.svg");
+    icons.set("university", "school_pinlet.svg");
 
     icons.forEach((icon, name) => {
       if (category?.toLowerCase().indexOf(name.toLowerCase()) !== -1) {
@@ -62,12 +66,63 @@ export class Helper {
       }
     })
 
-    for (var icon in icons) {
-
-    }
-
-    return `/assets/icon/${iconName}`;
+    return `http://${this.getHostNameWithPort()}/assets/icon/${iconName}`;
 
   }
+
+  getHostNameWithPort = (): string => {
+    const hostName = window.location.hostname;
+    const port = window.location.port;
+    return port ? `${hostName}:${port}` : hostName;
+  }
+
+  getIconWithNumber = (category:string, sequence:number) => {
+      var iconUrl = this.getIcon(category);
+      var svgString = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+            <defs>
+                <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feDropShadow dx="1" dy="1" stdDeviation="2" flood-color="black" flood-opacity="0.5"/>
+                </filter>
+            </defs>
+            <g>
+                <image href="${iconUrl}" height="${28}" width="${28}" />
+                <text text-anchor="middle" font-size="12" x="50%" y="50%" dy=".3em" stroke-width="0" fill="#FFFFFF" filter="url(#shadow)">${sequence}</text>
+            </g>
+        </svg>`;
+      var svg = 'data:image/svg+xml;charset=UTF-8;base64,' + btoa(svgString);
+      return { url: svg, height: 28, width: 28 };
+  };
+
+  getColorByNumber = (num: number = 0, op: number = 0.75) => {  
+    const colors = [  
+        [34, 98, 210, op],  
+        [120, 45, 78, op],  
+        [230, 110, 50, op],  
+        [15, 180, 255, op],  
+        [90, 140, 190, op],  
+        [255, 99, 71, op],  
+        [218, 165, 32, op],  
+        [75, 0, 130, op],  
+        [255, 20, 147, op],  
+        [0, 128, 0, op]  
+    ];  
   
+    const index = Math.abs(num % colors.length);  
+    return colors[index];  
+  }
+
+  groupBy = (list: any[], keyGetter: (n: any) => any): Map<any, any>  => {
+    const map = new Map();
+    list.forEach((item) => {
+         const key = keyGetter(item);
+         const collection = map.get(key);
+         if (!collection) {
+             map.set(key, [item]);
+         } else {
+             collection.push(item);
+         }
+    });
+    return map;
+}
 }

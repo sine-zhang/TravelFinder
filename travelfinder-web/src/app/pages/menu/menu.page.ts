@@ -46,7 +46,13 @@ export class MenuPage implements OnInit {
     this.helper.serializePlanItems(this.planItems);
     localStorage.removeItem(deleteItem.id);
 
-    this.goToItem(deleteItem.id);
+    let lastPlanItem = this.planItems.at(-1);
+
+    if(lastPlanItem) {
+      this.goToItem(lastPlanItem);
+    } else {
+      this.router.navigate(['/']);
+    }
   }
 
   onItemSave(saveItem:PlanItem) {

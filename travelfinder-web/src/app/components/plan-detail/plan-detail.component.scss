@@ -59,3 +59,15 @@
 ion-item .custom {
   width: 100%;
 }
+
+.actionsToolbar {
+  display: flex;
+  justify-content: end;
+  width:50px;
+}
+
+.place-description {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}

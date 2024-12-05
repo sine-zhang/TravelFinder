@@ -1,7 +1,9 @@
 <ion-header>
   <ion-toolbar>
     <ion-buttons slot="start">
-      <ion-back-button [defaultHref]="planPath"></ion-back-button>
+      <ion-button (click)="goBack()">
+        <ui5-icon name="arrow-left"></ui5-icon>
+      </ion-button>
     </ion-buttons>
   </ion-toolbar>
 </ion-header>
@@ -9,11 +11,14 @@
   <ui5-dynamic-page id="page" show-footer>
     <ui5-dynamic-page-title slot="titleArea">
       <ui5-title wrapping-type="None" slot="heading">
-        {{ (plan | async)?.Name }}
+        {{ (plan | async)?.planModel?.name }}
       </ui5-title>
-      <ui5-toolbar id="actionsToolbar" slot="actionsBar" design="Transparent">
-        <ui5-toolbar-button id="edit-button" design="Transparent" icon="ai" (click)="submitHint()"></ui5-toolbar-button>
+
+      <div class="actionsToolbar" ></div>
+      <ui5-toolbar  slot="actionsBar" design="Transparent">
+          <ui5-toolbar-button id="edit-button" design="Transparent" [icon]="isLoading ? 'lateness':'ai'" (click)="submitHint()" [disabled]="isLoading"></ui5-toolbar-button>
       </ui5-toolbar>
+
     </ui5-dynamic-page-title>
 
     <ui5-dynamic-page-header slot="headerArea">
@@ -21,30 +26,71 @@
         <div class="product-info-cell">
           <ui5-label>Description</ui5-label>
           <ui5-text class="product-description">
-            {{ (plan | async)?.Description }}
+            {{ (plan | async)?.planModel?.description }}
           </ui5-text>
+        </div>
+        <div class="product-info-cell">
+          <ui5-label>Distance</ui5-label>
+          <ui5-text class="availability">{{ (plan | async)?.totalDistance() }}</ui5-text>
+        </div>
+        <div class="product-info-cell">
+          <ui5-label>Time</ui5-label>
+          <ui5-text class="price">{{ (plan | async)?.totalFormattedTime() }}</ui5-text>
         </div>
       </div>
     </ui5-dynamic-page-header>
 
     <ui5-wizard id="wiz">
-      <ui5-wizard-step class="plan-location" *ngFor="let location of (plan | async)?.Locations; let i = index">
-        <div style="display: flex; min-height: 200px; flex-direction: column;">
-          <ui5-title>{{location.Number}}.{{location.Name}}</ui5-title>
-          <br />
-          <ui5-label>
-            {{ location.FormattedAddress  }}
-          </ui5-label>
-          <p>
-            {{ location.SuggestReason  }}
-          </p>
-          <ion-item lines="none" *ngIf="location.toggleStatus">
-            <ui5-input class="custom" placeholder="Give a hint" [(ngModel)]="location.Hint" (ngModelChange)="modelChanged(location,i)"></ui5-input>
-          </ion-item>
+      <ng-container *ngIf="(groupPlaces | async) as rawGroupPlaces">
+        <ui5-wizard-step icon="product">
+          <ui5-timeline layout="Vertical" id="testTimeline">
 
-          <ui5-toggle-button class="hint" icon="user-edit" (click)="location.toggleStatus=!location.toggleStatus"></ui5-toggle-button>
-        </div>
-      </ui5-wizard-step>
+            <ui5-timeline-group-item *ngFor="let groupPlace of rawGroupPlaces | keyvalue" [groupName]="'DAY ' + groupPlace.key">
+              <ng-container *ngFor="let place of groupPlace.value">
+                <ui5-timeline-item *ngIf="!displayLoadingMusk(place)" id="testItem" class="group-item plan-location" [name]="place.name" [subtitleText]="'Duration:' + formatMinutes(place.stopTime)">
+                    <div class="place-description">
+                      <ui5-avatar size="S">
+                        <img [src]="getIcon(place.primaryType)" />
+                      </ui5-avatar>
+                      <ui5-label>{{ place.reason  }}</ui5-label>
+                    </div>
+                    <ion-item lines="none" *ngIf="place.toggleStatus" style="width: 100%">
+                      <ui5-combobox style="width:100%" placeholder="Suggestions..." [loading]="!place.suggestLocations" (change)="suggestClick($event, place)">
+                        <ui5-cb-item [text]="suggest.DisplayName.Text" additional-text="" *ngFor="let suggest of place.suggestLocations"></ui5-cb-item>
+                      </ui5-combobox>
+                    </ion-item>
+                    <span class="hint">
+                      <!-- <ui5-toggle-button icon="add"></ui5-toggle-button> -->
+                      <ui5-toggle-button icon="user-edit" (click)="toggleClick(place)"></ui5-toggle-button>
+                    </span>
+                </ui5-timeline-item>
+                <ng-container  *ngIf="displayLoadingMusk(place)">
+                  <ion-item lines="none">
+                    <ion-thumbnail slot="start" style="width: 40%; height:30px">
+                      <ion-skeleton-text [animated]="true"></ion-skeleton-text>
+                    </ion-thumbnail>
+                  </ion-item>
+                  <ion-item lines="none">
+                    <ion-label>
+                      <h3 style="font-size: large;">
+                        <ion-skeleton-text [animated]="true" style="width: 100%;"></ion-skeleton-text>
+                      </h3>
+                      <p>
+                        <ion-skeleton-text [animated]="true" style="width: 60%;"></ion-skeleton-text>
+                      </p>
+                      <p>
+                        <ion-skeleton-text [animated]="true" style="width: 30%;"></ion-skeleton-text>
+                      </p>
+                    </ion-label>
+                  </ion-item>
+                </ng-container>
+              </ng-container>
+            </ui5-timeline-group-item>
+
+        </ui5-timeline>
+        </ui5-wizard-step>
+      </ng-container>
+
     </ui5-wizard>
   </ui5-dynamic-page>
 

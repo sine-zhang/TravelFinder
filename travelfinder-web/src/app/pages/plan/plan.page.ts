@@ -6,12 +6,13 @@ import { MapComponent } from 'src/app/components/map/map.component';
 import { UI5Module } from 'src/app/shared/ui5.module';
 import { NavigationEnd, Router } from '@angular/router';
 import { Observable, filter, from, lastValueFrom, map, of, take } from 'rxjs';
-import { RouteService } from 'src/app/services/route.service';
+import { RouteService, StopLayer } from 'src/app/services/route.service';
 import Point from '@arcgis/core/geometry/Point';
 import GraphicsLayer from '@arcgis/core/layers/GraphicsLayer';
 import MapView from '@arcgis/core/views/MapView';
+import Extent from '@arcgis/core/geometry/Extent';
 import { environment } from 'src/environments/environment';
-import { ApiService, Creator, MessageBody, Place } from 'src/app/services/api.service';
+import { ApiService, Creator, Message, MessageBody, Place } from 'src/app/services/api.service';
 import * as webMercatorUtils from '@arcgis/core/geometry/support/webMercatorUtils';
 import { LoadingDirective } from 'src/app/directives/app-loading.directive';
 import { AppLoaderComponent } from 'src/app/components/app-loader/app-loader.component';
@@ -23,6 +24,8 @@ import { PlanDetailComponent } from 'src/app/components/plan-detail/plan-detail.
 import { PlaceDetail, PlaceDetailComponent } from 'src/app/components/place-detail/place-detail.component';
 import { GeocodeService } from 'src/app/services/geocode.service';
 import { FeatureLayerService } from 'src/app/services/feature-layer.service';
+import { parse } from 'best-effort-json-parser'
+import { MessageService } from 'src/app/services/message.service';
 
 @Component({
   selector: 'sp-plan',
@@ -50,7 +53,8 @@ export class PlanPage implements OnInit {
               private featureLayer: FeatureLayerService,
               private helper: Helper,
               private modalCtrl: ModalController,
-              private geocodeService: GeocodeService) {
+              private geocodeService: GeocodeService,
+              private messageService: MessageService) {
     this.inputForm = this.fb.group({
       prompt: ['', Validators.required]
     });
@@ -62,25 +66,48 @@ export class PlanPage implements OnInit {
       tokenUsed: 0,
       graphicsJSON:[],
       latitude: 0,
-      longitude: 0
+      longitude: 0,
+      plan: null
     };
+
+    this.fullPlan = new Plan();
   }
 
   async ngOnInit() {
     this.router.events.pipe(filter(event => event instanceof NavigationEnd))
                       .subscribe(event => {
+                        this.jsonResult = "";
                         this.updateTitle(this.planId)
 
-                        this.messageBody = this.readMessags(this.planId);
+                        this.messageBody = this.messageService.readMessags(this.planId);
 
                         if (this.messageBody.graphicsJSON.length > 0) {
-                          const graphicLayers = this.fromGraphicJson(this.messageBody.graphicsJSON);
+                          const graphicLayers = this.messageService.fromGraphicJson(this.messageBody);
 
                           this.layers = of(graphicLayers);
                         } else {
                           this.layers = new Observable<GraphicsLayer[]>();
                         }
-                      });
+
+
+      });
+
+      this.api.jsonMessage.subscribe(message => {
+        if (!message) return;
+
+        this.jsonResult += message;
+
+        let detlaPlan = parse(this.jsonResult);
+        this.fullPlan.updatePlan(detlaPlan);
+
+        if (this.fullPlan.getPlaces().length > 0) {
+          this.stopLayer.graphics.removeAll();
+
+          this.routeService.upsertStopLayer(this.stopLayer, this.fullPlan.getPlaces());
+          this.layers = of([this.stopLayer]);
+        }
+
+      });
   }
 
   get planId() {
@@ -90,22 +117,35 @@ export class PlanPage implements OnInit {
     return values != null ? values[1] : "";
   }
 
+  initGroupStopLayer(places: Place[]) {
+    const groupPlaces = this.helper.groupBy(places, place => place.day);
+
+    for(let [day, subPlaces] of groupPlaces) {
+      let stopLayer = this.stopLayers.find(layer => layer.day == day);
+
+      if (!stopLayer) {
+        const newStopLayer = this.routeService.createEmptyStopLayer(day);
+        this.stopLayers.push({day: day, layer: newStopLayer});
+
+        stopLayer = { day: day, layer: newStopLayer };
+      } else {
+        stopLayer.layer.graphics.removeAll();
+      }
+
+      this.routeService.upsertStopLayer(stopLayer.layer, subPlaces);
+    }
+  }
+
   async onMapReady(view: MapView) {
     const scale = view.scale || environment.MAX_SCALE;
     const radius = scale >= environment.MAX_SCALE ? environment.MAX_SCALE:scale;
 
     console.log(radius);
 
+    this.currentCoords = this.getCurrentCoords(view);
+
     view.on("drag", (event:any) => {
-      let mapCenter = view.extent.center;
-
-      var newPoint = webMercatorUtils.webMercatorToGeographic(mapCenter);
-      const centerJSON = newPoint.toJSON();
-
-      this.currentCoords = {
-        lng: centerJSON.x,
-        lat: centerJSON.y
-      };
+      this.currentCoords = this.getCurrentCoords(view);
     });
 
     view.on("click", async (event:any) => {
@@ -113,6 +153,8 @@ export class PlanPage implements OnInit {
         x: event.x,
         y: event.y
       };
+
+      this.currentCoords = this.getCurrentCoords(view);
 
       view.hitTest(this.screenPoint).then((response:any) => {
         if (response.results.length) {
@@ -122,11 +164,11 @@ export class PlanPage implements OnInit {
           console.log(layer);
 
           if (layer) {
-            this.router.navigateByUrl(`/detail/${layer.graphic.attributes.id}`);
+            this.router.navigateByUrl(`/detail/${layer.graphic.attributes.id}`, { replaceUrl: true } );
           }
         }
       });
-      
+
       console.log(this.screenPoint);
     });
   }
@@ -136,6 +178,18 @@ export class PlanPage implements OnInit {
       latitude: this.currentCoords.lat,
       longitude: this.currentCoords.lng
     }));
+  }
+
+  getCurrentCoords(view:MapView) {
+    let mapCenter = view.extent.center;
+
+    var newPoint = webMercatorUtils.webMercatorToGeographic(mapCenter);
+    const centerJSON = newPoint.toJSON();
+
+    return {
+      lng: centerJSON.x,
+      lat: centerJSON.y
+    };
   }
 
   async submit() {
@@ -151,41 +205,60 @@ export class PlanPage implements OnInit {
 
     const lat = this.currentCoords.lat;
     const lng = this.currentCoords.lng;
+    try
+    {
+      this.stopLayer = this.routeService.createEmptyStopLayer();
 
-    const message = await this.api.getCommandByMessages(requestMessages, lat, lng);
-    const content = message.Choices[0]?.Message.content;
+      const content = await this.api.getStreamCommandByMessages(this.planId, requestMessages, lat, lng);
+      const error = this.getError(content);
 
-    this.isLoading = false;
-
-    const error = this.getError(content);
-
-    if (error) {
-      this.errorMessage = error;
-    } else {
-      const places = this.getPlaces(content);
-
-      if (places) {
+      if (error) {
+        this.errorMessage = error;
+        this.jsonResult = "";
+      } else if (this.stopLayer.graphics.length > 1) {
         this.messageBody.messages = this.messageBody.messages.concat([
-        {
-          content: prompt,
-          role: Creator.Me
-        },
-        {
-          content: content,
-          role: Creator.Bot
-        }]);
+          {
+            content: prompt,
+            role: Creator.Me
+          },
+          {
+            content: content,
+            role: Creator.Bot
+          }]);
 
-        this.layers = this.routeService.createRouteLayer(places, this.planId).pipe(take(1));
-
-        this.layers.subscribe(layers => {
-          this.currentLayers = layers;
-
-          this.messageBody.graphicsJSON = this.toGraphicJson(this.currentLayers);
-
-          this.saveMessages(this.planId, this.messageBody);
-        });
+        const layers = this.routeService.createRouteLayer(this.stopLayer, this.planId).pipe(take(1));
+        layers.subscribe(layers => this.processLayers(layers));
       }
     }
+    catch(ex){
+      console.log(ex);
+    }
+    finally{
+      this.isLoading = false;
+      this.jsonResult = "";
+    }
+
+  }
+
+  processLayers(layers: GraphicsLayer[]) {
+    const stopLayer = layers.find((layer: any) => layer.id == "stop_layer");
+
+    if (!stopLayer) {
+      return;
+    }
+
+    this.fullPlan.updateTravelTime(stopLayer);
+
+    console.log(this.fullPlan);
+
+    this.messageBody.graphicsJSON = this.messageService.toGraphicJson(layers);
+    this.messageBody.plan = this.fullPlan;
+
+    this.messageBody.latitude = this.currentCoords.lat;
+    this.messageBody.longitude = this.currentCoords.lng;
+
+    this.messageService.saveMessages(this.planId, this.messageBody);
+    this.layers = of(layers);
   }
 
   getLocations(result: any) {
@@ -195,25 +268,11 @@ export class PlanPage implements OnInit {
     return locations;
   }
 
-  getPlaces(result: any) {
-    const plan = JSON.parse(result);
-    let places = plan.Locations.map((location:any):Place => {
-      return {
-        name: location.Name,
-        formattedAddress: location.FormattedAddress,
-        primaryType: location.PrimaryType,
-        location: {
-          latitude: location.Latitude,
-          longitude: location.Longitude,
-        },
-        reason: location.SuggestReason
-      }
-    })
-
-    return places;
-  }
-
   getError(result: any) {
+    if (result && !this.helper.isJson(result)) {
+      return result;
+    }
+
     const message = JSON.parse(result);
 
     if ((!message.Locations ||  message.Locations.length == 0) && message.Description) {
@@ -225,62 +284,6 @@ export class PlanPage implements OnInit {
 
   clearError() {
     this.errorMessage = "";
-  }
-
-  readMessags(planId:string) {
-    const messageValue = localStorage.getItem(planId);
-    let messageBody:MessageBody = {
-      system: "",
-      messages: [],
-      tokenUsed: 0,
-      graphicsJSON: [],
-      latitude:null,
-      longitude:null
-    };
-
-    if(messageValue) {
-      messageBody = JSON.parse(messageValue);
-    }
-
-    return messageBody;
-  }
-
-  saveMessages(planId:string, messageBody:MessageBody) {
-    messageBody.latitude = this.currentCoords.lat;
-    messageBody.longitude = this.currentCoords.lng;
-
-    const messageValue = JSON.stringify(messageBody);
-
-    localStorage.setItem(planId, messageValue);
-  }
-
-  toGraphicJson(graphicLayers: GraphicsLayer[]) {
-    let graphicsJson = graphicLayers.map(layer => {
-      return {
-        id: layer.id,
-        graphics: layer.graphics.map(graphic => graphic.toJSON())
-      };
-    });
-
-    return graphicsJson;
-  }
-
-  fromGraphicJson(graphicJsons: any[]) {
-    let graphicsLayer:GraphicsLayer[] = [];
-
-    graphicJsons.forEach((graphicJson: any) => {
-      let graphicLayer = new GraphicsLayer({
-        id: graphicJson.id
-      });
-
-      graphicJson.graphics.forEach((graphic:any) =>
-        graphicLayer.add(Graphic.fromJSON(graphic))
-      );
-
-      graphicsLayer.push(graphicLayer);
-    });
-
-    return graphicsLayer;
   }
 
   updateTitle(planId:string) {
@@ -324,7 +327,8 @@ export class PlanPage implements OnInit {
       attributes:{
         Name: placeDetail.name,
         Category: placeDetail.category,
-        Description: placeDetail.description
+        Description: placeDetail.description,
+        FormattedAddress: placeDetail.formattedAddress
       }
     };
 
@@ -341,7 +345,178 @@ export class PlanPage implements OnInit {
   isLoading:boolean = false;
   errorMessage: string = "";
 
-  currentLayers!: GraphicsLayer[];
   title:string = "Plan";
   screenPoint:any;
+
+  jsonResult:string = "";
+
+  stopLayer!:GraphicsLayer;
+  stopLayers!: StopLayer[];
+
+  fullPlan: Plan;
+}
+
+export interface PlanModel {
+  name: string,
+  description: string,
+  places: Place[],
+  groupPlaces: Map<number, Place[]>
+}
+
+export class Plan {
+  constructor(rawPlan: any = null) {
+    this.planModel = {
+      name: "",
+      description: "",
+      places: [],
+      groupPlaces: new Map<number, Place[]>()
+    };
+
+    if (rawPlan)
+    {
+      this.updatePlan(rawPlan);
+    }
+  }
+
+  static getPlaces(obj: any): Place[] {
+    let locations = [];
+
+    if (Array.isArray(obj)) {
+      locations = obj;
+    } else {
+      locations = obj.Locations;
+    }
+
+    let places = locations?.filter((place:any)=> this.isValidLocation(place))
+                     .map((location:any):Place => {
+          return {
+            name: location.Name,
+            formattedAddress: location.FormattedAddress,
+            primaryType: location.PrimaryType,
+            location: {
+              latitude: location.Latitude,
+              longitude: location.Longitude,
+            },
+            reason: location.SuggestReason,
+            number: location.Number,
+            day: location.Day,
+            stopTime: location.Duration,
+            travelTime: 0,
+            toggleStatus: false,
+            suggestLocations: [],
+            hint: "",
+            distance: 0,
+            sequence: 0
+          }
+      });
+
+      return places;
+  }
+
+
+  static isValidLocation(location:any) {
+    return location.Name && location.FormattedAddress && location.PrimaryType
+           && location.Latitude && location.Longitude && location.SuggestReason
+           && location.Number;
+  }
+
+  static toLocationJSON(place: Place) {
+    return {
+      Name: place.name,
+      FormattedAddress: place.formattedAddress,
+      PrimaryType: place.primaryType,
+      Latitude: place.location.latitude,
+      Longitude: place.location.longitude,
+      SuggestReason: place.reason,
+      Number: place.number,
+      Day: place.day,
+      Duration: place.stopTime
+    };
+  }
+
+  static fromPlanObj(obj: any) {
+    const newPlan = new Plan();
+
+    newPlan.planModel = obj;
+
+    return newPlan;
+  }
+
+  totalFormattedTime() {
+    return this.formatMinutesToDHMS(this.totalTime());
+  }
+
+  totalTime() {
+    return this.planModel.places.reduce((total, place) => total + place.stopTime + place.travelTime, 0);
+  }
+
+  totalDistance() {
+    const value = this.planModel.places.reduce((total, place) => total + place.distance, 0);
+    return Number(value).toFixed(2);
+  }
+
+  toLocationJSON() {
+    return {
+      Name: this.planModel.name,
+      Description: this.planModel.description,
+      Locations: this.planModel.places.map((place: any) => {
+        return {
+          Name: place.name,
+          FormattedAddress: place.formattedAddress,
+          PrimaryType: place.primaryType,
+          Latitude: place.location.latitude,
+          Longitude: place.location.longitude,
+          SuggestReason: place.reason,
+          Number: place.number,
+          Day: place.day,
+          Duration: place.stopTime
+        }
+      })
+    };
+  }
+
+  updatePlan(detlaPlan: any) {
+    this.planModel.name = detlaPlan?.Name;
+    this.planModel.description = detlaPlan?.Description;
+    this.planModel.places = Plan.getPlaces(detlaPlan);
+  }
+
+  updatePlanByLocations(locations: []) {
+    this.planModel.places = Plan.getPlaces(locations);
+  }
+
+  updateTravelTime(stopLayer: GraphicsLayer) {
+    const stopInfoList = stopLayer.graphics.map((graphic: any) => graphic.attributes).sort((a: any, b: any) => a.Sequence - b.Sequence);
+
+    stopInfoList?.forEach((stop: any, index: number) => {
+      if (index > 0) {
+        stop.TravelTime = stop.Cumul_TravelTime - stopInfoList.getItemAt(index - 1).Cumul_TravelTime;
+        stop.TravelDistance = stop.Cumul_Kilometers - stopInfoList.getItemAt(index - 1).Cumul_Kilometers;
+      } else {
+        stop.TravelTime = 0;
+        stop.TravelDistance = 0;
+      }
+    });
+
+    const places = this.getPlaces();
+    places.forEach((place, index) => {
+      place.travelTime = stopInfoList?.find((stop: any) => stop.Number == place.number && stop.Day == place.day)?.TravelTime || 0;
+      place.distance = stopInfoList?.find((stop: any) => stop.Number == place.number && stop.Day == place.day)?.TravelDistance || 0;
+      place.sequence = stopInfoList?.find((stop: any) => stop.Number == place.number && stop.Day == place.day)?.Sequence || 0;
+    });
+  }
+
+  getPlaces() {
+    return this.planModel.places || [];
+  }
+
+  formatMinutesToDHMS(minutes: number): string {
+    const days = Math.floor(minutes / 1440);
+    const remainingMinutesAfterDays = minutes % 1440;
+    const hours = Number(Math.floor(remainingMinutesAfterDays / 60)).toFixed(2);
+    const mins = Number(remainingMinutesAfterDays % 60).toFixed(2);
+    return `${days.toString().padStart(2, '0')} Days, ${hours.toString().padStart(2, '0')} Hours, ${mins.toString().padStart(2, '0')} Minutes`;
+  }
+
+  planModel!: PlanModel;
 }

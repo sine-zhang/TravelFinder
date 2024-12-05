@@ -3,6 +3,11 @@ import { BehaviorSubject } from 'rxjs';
 import { environment } from 'src/environments/environment';
 import { Helper } from '../shared/helper';
 import GraphicsLayer from '@arcgis/core/layers/GraphicsLayer';
+import { makeStreamingJsonRequest } from "http-streaming-request";
+import { parse } from 'best-effort-json-parser'
+import { fromFetch } from 'rxjs/fetch';
+import { switchMap, of, catchError } from 'rxjs';
+import { Plan, PlanModel } from '../pages/plan/plan.page';
 
 export interface Message {
   content: string;
@@ -15,13 +20,15 @@ export interface Message {
 export class ApiService {
 
   public nextMessage = new BehaviorSubject<DoneMessage|null>(null);
+  public jsonMessage = new BehaviorSubject<string|null>(null);
   private messages = new BehaviorSubject<Message[]>([]);
 
   constructor(private helper:Helper) { }
 
-  async getHintByMessages(message: Message, lat: number, lng: number) {
+  async getHintByMessages(planId: string, systemId:string, message: Message, lat: number, lng: number) {
     const fullMessage = {
-      SystemId: "",
+      RequestId: planId,
+      SystemId: systemId,
       Messages: [message],
       Latitude: lat,
       Longitude: lng
@@ -51,6 +58,48 @@ export class ApiService {
     return null;
   }
   
+  async getStreamCommandByMessages(planId:string, messages: Message[], lat: number, lng: number): Promise<string> {
+    const fullMessage = {
+      RequestId: planId,
+      SystemId: "gis_helper",
+      Messages: messages,
+      Latitude: lat,
+      Longitude: lng
+    };
+
+    let content = "";
+
+    const response = await fetch(`${environment.API_URL}/chat/streamcommand`, {
+      method: "POST",
+      cache: "no-cache",
+      keepalive: true,
+      headers: {
+          "Content-Type": "application/json",
+          "Accept": "text/event-stream"
+      },
+      body: JSON.stringify(fullMessage),
+    });
+    
+    if(!response || !response.body)return "";
+
+    const reader = response.body.getReader();
+    let tiktokenCounter = 0;
+  
+    while (true) {
+        const {value, done} = await reader.read();
+        if (done){
+          break;
+        }
+        
+        var result = new TextDecoder().decode(value) as string;
+
+        this.jsonMessage.next(result);
+        content += result;
+    }
+
+    return content;
+  }
+
   async getCommandByMessages(messages: Message[], lat: number, lng: number){
     const fullMessage = {
       SystemId: "gis_helper",
@@ -141,6 +190,24 @@ export class ApiService {
   getMessage(){
     return this.messages.asObservable();
   }
+
+  async nearPoint(latitude:number, longitude:number, langCode:string, radius:number) {
+    const response = await fetch(`${environment.API_URL}/map/nearpoint?latitude=${latitude}&longitude=${longitude}&languageCode=${langCode}&radius=${radius}`, {
+      method: "GET",
+      cache: "no-cache"
+    });
+
+    if(!response || !response.body)return;
+
+    const reader = response.body.getReader();
+    const {value, done} = await reader.read();
+
+    const responseBody = new TextDecoder().decode(value) as any;
+
+    const result = JSON.parse(responseBody);
+
+    return result;
+  }
 }
 
 export enum Creator {
@@ -164,7 +231,8 @@ export interface MessageBody{
   tokenUsed:number,
   graphicsJSON: any[],
   latitude: any,
-  longitude: any
+  longitude: any,
+  plan: Plan | null,
 }
 
 export interface DoneMessage {
@@ -180,5 +248,15 @@ export interface Place {
     latitude: any,
     longitude: any
   },
-  reason: string
+  reason: string,
+  number: number,
+  day: number,
+  travelTime: number,
+  stopTime: number,
+  distance: number,
+  sequence: number,
+
+  toggleStatus: boolean,
+  suggestLocations: any[],
+  hint: string
 }
