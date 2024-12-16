@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using TravelfinderAPI.Functions;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace TravelfinderAPI.Controllers
 {
@@ -13,21 +14,25 @@ namespace TravelfinderAPI.Controllers
         private string _openAiKey;
         private PromotTemplate[] _promotTemplate;
         private readonly bool _enableProxy;
+        private readonly IMemoryCache _cache;
 
-        public MapController(ILogger<ChatController> logger, IConfiguration configuration)
+        public MapController(ILogger<ChatController> logger, IConfiguration configuration, IMemoryCache cache)
         {
             _logger = logger;
             _openAiKey = configuration["GMPGIS_API_KEY"];
             _enableProxy = Convert.ToBoolean(configuration["ENABLE_PROXY"]);
+            _cache = cache;
         }
 
         [HttpGet]
         [Route("NearPoint")]
-        public async Task<ActionResult> NearPoint(double latitude, double longitude, string languageCode, int radius, int pageSize = 20)
+        public async Task<ActionResult> NearPoint(string requestId, double latitude, double longitude, string languageCode, int radius, int pageSize = 20)
         {
             var apiClient = new GmpGisApiClient(_openAiKey, _enableProxy);
 
-            var result = await apiClient.NearPoint(latitude, longitude, radius, languageCode, pageSize, new string[] { });
+            var planInfo = _cache.Get<PlanInfo>(requestId);
+
+            var result = await apiClient.NearPoint(latitude, longitude, radius, languageCode, pageSize, planInfo != null ? planInfo.Categories : new string[] { });
 
             return Ok(JsonConvert.SerializeObject(result));
         }

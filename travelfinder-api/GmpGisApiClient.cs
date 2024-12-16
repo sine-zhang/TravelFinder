@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Caching.Memory;
 using Newtonsoft.Json;
 using System.Drawing.Printing;
 using System.Reflection;
@@ -92,7 +93,7 @@ namespace TravelfinderAPI.GmpGis
             return geocodeResult;
         }
 
-        public async Task<PlaceResult> NearPoint(double latitude, double longitude, int radius, string languageCode, int pageSize, string[] includeTypes, bool enableCache = true)
+        public async Task<PlaceResult> NearPoint(double latitude, double longitude, int radius, string languageCode, int pageSize, string[] includeTypes, bool enableCache = false)
         {
             var newCoord = new Coordinates(latitude, longitude);
             var oldCoord = new Coordinates(_latitude, _longitude);
@@ -160,6 +161,7 @@ namespace TravelfinderAPI.GmpGis
         private readonly HttpClient _httpClient;
         private readonly string _apiKey;
         private readonly bool _enableProxy;
+        private readonly IMemoryCache _cache;
 
         private double _latitude;
         private double _longitude;

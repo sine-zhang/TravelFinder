@@ -22,14 +22,17 @@ namespace TravelfinderAPI.Controllers
         private ArcGisApiClient _arcGisApiClient;
         private readonly ILogger<ChatController> _logger;
         private string _openAiKey;
+        private string _xAiKey;
         private PromotTemplate[] _promotTemplate;
         private readonly bool _enableProxy;
-        private OpenAIApiClient _openAIApiClient;
+        private AzureAIApiClient _openAIApiClient;
+        private xAIApiClient _xAIApiClient;
 
-        public ChatController(ILogger<ChatController> logger, IConfiguration configuration, GmpGisApiClient gmpGisApiClient, ArcGisApiClient arcGisApiClient)
+        public ChatController(ILogger<ChatController> logger, IConfiguration configuration, GmpGisApiClient gmpGisApiClient, ArcGisApiClient arcGisApiClient, IMemoryCache cache)
         {
             _logger = logger;
-            _openAiKey = configuration["OPENAI_API_KEY"];
+            _openAiKey = configuration["AZUREAI_API_KEY"];
+            _xAiKey = configuration["XAI_API_KEY"];
             _enableProxy = Convert.ToBoolean(configuration["ENABLE_PROXY"]);
             var promotTemplate = configuration.GetSection("PROMOT_TEMPLATE").Get<PromotTemplate[]>();
 
@@ -37,7 +40,8 @@ namespace TravelfinderAPI.Controllers
             _arcGisApiClient = arcGisApiClient;
             _promotTemplate = promotTemplate;
 
-            _openAIApiClient = new OpenAIApiClient(_openAiKey, _enableProxy, arcGisApiClient, promotTemplate, gmpGisApiClient);
+            _openAIApiClient = new AzureAIApiClient(_openAiKey, _enableProxy, arcGisApiClient, promotTemplate, gmpGisApiClient, cache);
+            _xAIApiClient = new xAIApiClient(_xAiKey, _enableProxy, arcGisApiClient, promotTemplate, gmpGisApiClient);
         }
 
         [HttpGet]
@@ -147,7 +151,8 @@ namespace TravelfinderAPI.Controllers
                     var choiceJson = "";
                     while (!reader.EndOfStream)
                     {
-                        var totalResult = "";
+                        var totalJsonResult = "";
+                        var totalTextResult = "";
                         string data = reader.ReadLine();
 
                         data = data.Replace("data: ", "").Trim();
@@ -174,14 +179,27 @@ namespace TravelfinderAPI.Controllers
                             {
                                 if (choice.Delta.ToolCalls != null)
                                 {
-                                    totalResult += string.Join("", choice.Delta.ToolCalls.Select(toolCall => toolCall.Function.ArgumentsContent));
+                                    totalJsonResult += string.Join("", choice.Delta.ToolCalls.Select(toolCall => toolCall.Function.ArgumentsContent));
+                                }
+                                else if (choice.Delta.Content != null)
+                                {
+                                    totalTextResult += string.Join("", choice.Delta.Content);
                                 }
                             }
                         }
 
-                        totalResult = totalResult.Replace("\n", "");
+                        if (!string.IsNullOrEmpty(totalJsonResult))
+                        {
+                            totalJsonResult = totalJsonResult.Replace("\n", "");
 
-                        await HttpContext.SSESendDataAsync(totalResult);
+                            await HttpContext.SSESendDataAsync(totalJsonResult);
+                        }
+                        else if(!string.IsNullOrEmpty(totalTextResult))
+                        {
+                            totalTextResult = totalTextResult.Replace("\n", "");
+
+                            await HttpContext.SSESendDataAsync(totalTextResult);
+                        }
                     }
                 }
             }
@@ -240,13 +258,23 @@ namespace TravelfinderAPI.Controllers
         [Route("Hint")]
         public async Task<ActionResult> Hint([FromBody] MessageRequest messageRequest)
         {
-            var placeResult = await _gmpGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 1000, "en-us", 20, new string[] { });
-
             var message = messageRequest.Messages.First();
+            var target = JsonConvert.DeserializeObject<Plan[]>(message.Content);
+            var hintLocation = target.Where(location => !string.IsNullOrEmpty(location.Hint)).FirstOrDefault();
+
+
+            GmpGis.PlaceResult placeResult;
+            if (hintLocation != null)
+            {
+                placeResult = await _gmpGisApiClient.SearchText(hintLocation.Hint, messageRequest.Latitude, messageRequest.Longitude, 1000, "en-us", 20);
+            }
+            else
+            {
+                placeResult = await _gmpGisApiClient.NearPoint(messageRequest.Latitude, messageRequest.Longitude, 1000, "en-us", 20, new string[] { });
+            }
+
             var systemId = string.IsNullOrEmpty(messageRequest.SystemId) ? "gis_helper_3" : messageRequest.SystemId;
             var systemMessage = _promotTemplate.First(template => template.Id == systemId);
-
-            var target = JsonConvert.DeserializeObject<Plan[]>(message.Content);
 
             var travelLocationJson = JsonConvert.SerializeObject(placeResult);
 

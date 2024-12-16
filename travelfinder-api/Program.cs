@@ -1,9 +1,15 @@
+using Microsoft.Extensions.Caching.Memory;
 using TravelfinderAPI;
 using TravelfinderAPI.GmpGis;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+
+builder.Services.AddSingleton<IMemoryCache>(services =>
+{
+    return new MemoryCache(new MemoryCacheOptions());
+});
 
 builder.Services.AddScoped<GmpGisApiClient>(services =>
 {

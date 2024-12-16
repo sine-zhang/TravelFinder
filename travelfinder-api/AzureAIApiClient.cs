@@ -14,18 +14,19 @@ using Microsoft.Extensions.Caching.Memory;
 namespace TravelfinderAPI
 {
 
-    public class OpenAIApiClient
+    public class AzureAIApiClient
     {
         private readonly HttpClient _httpClient;
         private readonly string _apiKey;
         private readonly ArcGisApiClient _arcGisApiClient;
         private readonly GmpGisApiClient _gmpGisApiClient;
         private readonly PromotTemplate[] _promotTemplates;
+        private readonly IMemoryCache _cache;
 
         public double Latitude { get; set; }
         public double Longitude { get; set; }
 
-        public OpenAIApiClient(string apiKey, bool enableProxy, ArcGisApiClient arcGisApiClient, PromotTemplate[] promotTemplates, GmpGisApiClient gmpGisApiClient)
+        public AzureAIApiClient(string apiKey, bool enableProxy, ArcGisApiClient arcGisApiClient, PromotTemplate[] promotTemplates, GmpGisApiClient gmpGisApiClient, IMemoryCache cache)
         {
             if(enableProxy)
             {
@@ -56,6 +57,8 @@ namespace TravelfinderAPI
             _arcGisApiClient = arcGisApiClient;
             _promotTemplates = promotTemplates;
             _gmpGisApiClient = gmpGisApiClient;
+
+            _cache = cache;
         }
 
         public async Task<Stream> SendPromptStream(string prompt, string apiKey = "", string model = "gpt-3.5-turbo")
@@ -213,14 +216,13 @@ namespace TravelfinderAPI
             return responseBody;
         }
 
-        public async Task<PlanInfo> GetPlanInfo(MessageRequest messageRequest, string systemId = "get_plan_info")
+        public async Task<PlanInfo> GetPlanInfo(MessageRequest messageRequest, bool useCache = false, string systemId = "get_plan_info")
         {
-            IMemoryCache cache = new MemoryCache(new MemoryCacheOptions());
+            var planInfo = new PlanInfo();
 
-            var planInfo = cache.Get<PlanInfo>(messageRequest.RequestId);
-
-            if (planInfo != null)
+            if (useCache)
             {
+                planInfo = _cache.Get<PlanInfo>(messageRequest.RequestId);
                 return planInfo;
             }
 
@@ -270,7 +272,7 @@ namespace TravelfinderAPI
 
                     planInfo = JsonConvert.DeserializeObject<PlanInfo>(toolCall.Function.ArgumentsContent);
 
-                    cache.Set(messageRequest.RequestId, planInfo);
+                    _cache.Set(messageRequest.RequestId, planInfo);
                 }
                 else if (!string.IsNullOrEmpty(staticChoice.Message.Content))
                 {
@@ -342,138 +344,4 @@ namespace TravelfinderAPI
             return staticCompletion;
         }
     }
-
-    public class Message
-    {
-        [JsonProperty("role")]
-        public string Role { get; set; }
-
-        [JsonProperty("content")]
-        public string Content { get; set; }
-    }
-
-    public class FunctionMessage
-    {
-        [JsonProperty("role")]
-        public string Role { get; set; }
-
-        [JsonProperty("content")]
-        public string Content { get; set; }
-
-        [JsonProperty("tool_calls")]
-        public ToolCall[]? ToolCalls { get; set; }
-    }
-
-    public class Choice
-    {
-        public FunctionMessage Delta { get; set; }
-        public int Index { get; set; }
-        public string FinishReason { get; set; }
-        public int TokenLength { get; set; }
-    }
-
-    public class StaticChoice
-    {
-        public FunctionMessage Message { get; set; }
-        public int Index { get; set; }
-        public string FinishReason { get; set; }
-        public int TokenLength { get; set; }
-    }
-
-    public class Completion
-    {
-        public string Id { get; set; }
-        public string Object { get; set; }
-        public string Model { get; set; }
-        public Choice[] Choices { get; set; }
-    }
-
-    public class StaticCompletion
-    {
-        public string Id { get; set; }
-        public string Object { get; set; }
-        public string Model { get; set; }
-
-        public StaticChoice[] Choices { get; set; }
-    }
-
-    public class MessageRequest
-    {
-        public string RequestId { get; set; }
-        public string SystemId { get; set; }
-        public List<Message> Messages { get; set; }
-
-        public double Latitude { get; set; }
-        public double Longitude { get; set; }
-    }
-
-    public class PromotTemplate
-    {
-        public string Id { get; set; }
-        public string Promot { get; set; }
-
-        public Tool[] Tools { get; set; }
-    }
-
-    public class Plan
-    {
-        public string FormattedAddress { get; set; }
-        public double Latitude { get; set; }
-        public double Longitude { get; set; }
-        public string Name { get; set; }
-        public int Number { get; set; }
-        public string SuggestReason { get; set; }
-        public string Hint { get; set; }
-        public string PrimaryType { get; set; }
-        public double Duration { get; set; }
-        public int Day { get; set; }
-    }
-
-    public class Hint
-    {
-        public Plan[] Plans { get; set; }
-    }
-
-    public class CommandOptions
-    {
-        public Message[] Messages { get; set; }
-        public Tool[] Tools { get; set; }
-        public double Latitude { get; set; }
-        public double Longitude { get; set; }
-    }
-
-    public class AreaSuggest
-    {
-        [JsonProperty("start_categories")]
-        public string[] StartCategories { get; set; }
-        [JsonProperty("start_name")]
-        public string StartName { get; set; }
-        [JsonProperty("go_through_areas")]
-        public string[] GoThroughAreas { get; set; }
-        [JsonProperty("go_through_count")]
-        public int GoThroughCount { get; set; }
-        [JsonProperty("price_level")]
-        public string[] PriceLevel { get; set; }
-
-        public string Refinement { get; set; }
-    }
-
-    public class PlanInfo
-    {
-        [JsonProperty("locationCategoryList")]
-        public string[] Categories { get; set; }
-
-        [JsonProperty("budget_level")]
-        public string[] BudgetLevel { get; set; }
-
-        [JsonProperty("languageCode")]
-        public string Language { get; set; }
-
-        [JsonProperty("refinement")]
-        public string Refinement { get; set; }
-
-        [JsonProperty("pointOfInterest")]
-        public string[] PointOfInterests { get; set; }
-    }
-
 }

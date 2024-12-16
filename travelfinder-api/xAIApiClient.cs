@@ -14,7 +14,7 @@ using Microsoft.Extensions.Caching.Memory;
 namespace TravelfinderAPI
 {
 
-    public class OpenAIApiClient
+    public class xAIApiClient
     {
         private readonly HttpClient _httpClient;
         private readonly string _apiKey;
@@ -25,9 +25,9 @@ namespace TravelfinderAPI
         public double Latitude { get; set; }
         public double Longitude { get; set; }
 
-        public OpenAIApiClient(string apiKey, bool enableProxy, ArcGisApiClient arcGisApiClient, PromotTemplate[] promotTemplates, GmpGisApiClient gmpGisApiClient)
+        public xAIApiClient(string apiKey, bool enableProxy, ArcGisApiClient arcGisApiClient, PromotTemplate[] promotTemplates, GmpGisApiClient gmpGisApiClient)
         {
-            if(enableProxy)
+            if (enableProxy)
             {
                 var proxy = new WebProxy
                 {
@@ -51,14 +51,14 @@ namespace TravelfinderAPI
             }
 
             _apiKey = apiKey;
-            _httpClient.BaseAddress = new Uri("https://travelfinder.openai.azure.com/openai/deployments/gpt-4-2/");
+            _httpClient.BaseAddress = new Uri("https://api.x.ai/v1/");
 
             _arcGisApiClient = arcGisApiClient;
             _promotTemplates = promotTemplates;
             _gmpGisApiClient = gmpGisApiClient;
         }
 
-        public async Task<Stream> SendPromptStream(string prompt, string apiKey = "", string model = "gpt-3.5-turbo")
+        public async Task<Stream> SendPromptStream(string prompt, string apiKey = "", string model = "grok-2-1212")
         {
             var requestBody = new
             {
@@ -71,11 +71,11 @@ namespace TravelfinderAPI
             {
                 Content = JsonContent.Create(requestBody)
             };
-            
+
             Debug.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(requestBody));
 
             // HttpCompletionOption.ResponseHeadersRead is important, otherwise it won't stream
-            if(apiKey != string.Empty)
+            if (apiKey != string.Empty)
             {
                 _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
             }
@@ -87,7 +87,7 @@ namespace TravelfinderAPI
             return responseBody;
         }
 
-        public async Task<string> SendPrompt(string prompt, string model = "gpt-3.5-turbo")
+        public async Task<string> SendPrompt(string prompt, string model = "grok-2-1212")
         {
             var requestBody = new
             {
@@ -105,10 +105,11 @@ namespace TravelfinderAPI
             return responseBody;
         }
 
-        public async Task<Stream> SendStreamCommand(CommandOptions options)
+        public async Task<Stream> SendStreamCommand(CommandOptions options, string model = "grok-2-1212")
         {
             var requestBody = new
             {
+                model = model,
                 messages = options.Messages,
                 stream = true,
                 tools = options.Tools
@@ -119,14 +120,14 @@ namespace TravelfinderAPI
                 NullValueHandling = NullValueHandling.Ignore
             });
 
-            var requestMessage = new HttpRequestMessage(HttpMethod.Post, "chat/completions?api-version=2023-03-15-preview")
+            var requestMessage = new HttpRequestMessage(HttpMethod.Post, "chat/completions")
             {
-                Content = new StringContent(requestJson, Encoding.UTF8,"application/json")
+                Content = new StringContent(requestJson, Encoding.UTF8, "application/json")
             };
 
             Debug.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(requestBody));
 
-            requestMessage.Headers.Add("api-key", _apiKey);
+            requestMessage.Headers.Add("Authorization", $"Bearer {_apiKey}");
             var responseStream = Stream.Null;
             try
             {
@@ -142,21 +143,22 @@ namespace TravelfinderAPI
 
             return responseStream;
         }
-        
-        public async Task<StaticCompletion> SendCommands(Message[] messages, double latitude, double longitude, string apiKey = "")
+
+        public async Task<StaticCompletion> SendCommands(Message[] messages, double latitude, double longitude, string apiKey = "", string model = "grok-2-1212")
         {
             var requestBody = new
             {
+                model = model,
                 messages = messages,
                 stream = false
             };
 
-            var requestMessage = new HttpRequestMessage(HttpMethod.Post, "chat/completions?api-version=2023-03-15-preview")
+            var requestMessage = new HttpRequestMessage(HttpMethod.Post, "chat/completions")
             {
-                Content = new StringContent(JsonConvert.SerializeObject(requestBody),Encoding.UTF8,"application/json")
+                Content = new StringContent(JsonConvert.SerializeObject(requestBody), Encoding.UTF8, "application/json")
             };
 
-            requestMessage.Headers.Add("api-key", _apiKey);
+            requestMessage.Headers.Add("Authorization", $"Bearer {_apiKey}");
 
             Debug.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(requestBody));
 
@@ -181,7 +183,7 @@ namespace TravelfinderAPI
             return completion;
         }
 
-        public async Task<Stream> SendMessages(Message[] messages, string apiKey = "", string model = "gpt-3.5-turbo")
+        public async Task<Stream> SendMessages(Message[] messages, string apiKey = "", string model = "grok-2-1212")
         {
             var requestBody = new
             {
@@ -213,7 +215,7 @@ namespace TravelfinderAPI
             return responseBody;
         }
 
-        public async Task<PlanInfo> GetPlanInfo(MessageRequest messageRequest, string systemId = "get_plan_info")
+        public async Task<PlanInfo> GetPlanInfo(MessageRequest messageRequest, string systemId = "get_plan_info", string model = "grok-2-1212")
         {
             IMemoryCache cache = new MemoryCache(new MemoryCacheOptions());
 
@@ -245,7 +247,7 @@ namespace TravelfinderAPI
 
             Debug.WriteLine(requestJson);
 
-            var requestMessage = new HttpRequestMessage(HttpMethod.Post, "chat/completions?api-version=2023-03-15-preview")
+            var requestMessage = new HttpRequestMessage(HttpMethod.Post, "chat/completions")
             {
                 Content = new StringContent(requestJson, Encoding.UTF8, "application/json")
             };
@@ -263,7 +265,7 @@ namespace TravelfinderAPI
                 completion = JsonConvert.DeserializeObject<StaticCompletion>(responseBody);
 
                 var staticChoice = completion.Choices.FirstOrDefault();
-                
+
                 if (staticChoice.Message.ToolCalls?.Length > 0)
                 {
                     var toolCall = staticChoice.Message.ToolCalls.FirstOrDefault();
@@ -297,16 +299,16 @@ namespace TravelfinderAPI
 
         private async Task<StaticCompletion> ExecuteFunction(StaticCompletion staticCompletion, double latitude, double longitude)
         {
-            foreach(var choice in staticCompletion.Choices)
+            foreach (var choice in staticCompletion.Choices)
             {
                 if (choice.Message.ToolCalls is null)
                 {
                     continue;
                 }
 
-                foreach(var toolCall in choice.Message.ToolCalls)
+                foreach (var toolCall in choice.Message.ToolCalls)
                 {
-                    switch(toolCall.Function.Name)
+                    switch (toolCall.Function.Name)
                     {
                         case "QueryFeature":
 
@@ -334,7 +336,7 @@ namespace TravelfinderAPI
 
                             choice.Message.Content = JsonConvert.SerializeObject(featureResult);
                             break;
-                            
+
                     }
                 }
             }
@@ -342,138 +344,4 @@ namespace TravelfinderAPI
             return staticCompletion;
         }
     }
-
-    public class Message
-    {
-        [JsonProperty("role")]
-        public string Role { get; set; }
-
-        [JsonProperty("content")]
-        public string Content { get; set; }
-    }
-
-    public class FunctionMessage
-    {
-        [JsonProperty("role")]
-        public string Role { get; set; }
-
-        [JsonProperty("content")]
-        public string Content { get; set; }
-
-        [JsonProperty("tool_calls")]
-        public ToolCall[]? ToolCalls { get; set; }
-    }
-
-    public class Choice
-    {
-        public FunctionMessage Delta { get; set; }
-        public int Index { get; set; }
-        public string FinishReason { get; set; }
-        public int TokenLength { get; set; }
-    }
-
-    public class StaticChoice
-    {
-        public FunctionMessage Message { get; set; }
-        public int Index { get; set; }
-        public string FinishReason { get; set; }
-        public int TokenLength { get; set; }
-    }
-
-    public class Completion
-    {
-        public string Id { get; set; }
-        public string Object { get; set; }
-        public string Model { get; set; }
-        public Choice[] Choices { get; set; }
-    }
-
-    public class StaticCompletion
-    {
-        public string Id { get; set; }
-        public string Object { get; set; }
-        public string Model { get; set; }
-
-        public StaticChoice[] Choices { get; set; }
-    }
-
-    public class MessageRequest
-    {
-        public string RequestId { get; set; }
-        public string SystemId { get; set; }
-        public List<Message> Messages { get; set; }
-
-        public double Latitude { get; set; }
-        public double Longitude { get; set; }
-    }
-
-    public class PromotTemplate
-    {
-        public string Id { get; set; }
-        public string Promot { get; set; }
-
-        public Tool[] Tools { get; set; }
-    }
-
-    public class Plan
-    {
-        public string FormattedAddress { get; set; }
-        public double Latitude { get; set; }
-        public double Longitude { get; set; }
-        public string Name { get; set; }
-        public int Number { get; set; }
-        public string SuggestReason { get; set; }
-        public string Hint { get; set; }
-        public string PrimaryType { get; set; }
-        public double Duration { get; set; }
-        public int Day { get; set; }
-    }
-
-    public class Hint
-    {
-        public Plan[] Plans { get; set; }
-    }
-
-    public class CommandOptions
-    {
-        public Message[] Messages { get; set; }
-        public Tool[] Tools { get; set; }
-        public double Latitude { get; set; }
-        public double Longitude { get; set; }
-    }
-
-    public class AreaSuggest
-    {
-        [JsonProperty("start_categories")]
-        public string[] StartCategories { get; set; }
-        [JsonProperty("start_name")]
-        public string StartName { get; set; }
-        [JsonProperty("go_through_areas")]
-        public string[] GoThroughAreas { get; set; }
-        [JsonProperty("go_through_count")]
-        public int GoThroughCount { get; set; }
-        [JsonProperty("price_level")]
-        public string[] PriceLevel { get; set; }
-
-        public string Refinement { get; set; }
-    }
-
-    public class PlanInfo
-    {
-        [JsonProperty("locationCategoryList")]
-        public string[] Categories { get; set; }
-
-        [JsonProperty("budget_level")]
-        public string[] BudgetLevel { get; set; }
-
-        [JsonProperty("languageCode")]
-        public string Language { get; set; }
-
-        [JsonProperty("refinement")]
-        public string Refinement { get; set; }
-
-        [JsonProperty("pointOfInterest")]
-        public string[] PointOfInterests { get; set; }
-    }
-
 }
