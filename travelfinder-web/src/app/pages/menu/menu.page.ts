@@ -32,12 +32,15 @@ export class MenuPage implements OnInit {
   }
  
   onItemCreate(){
-    this.planItems.push({
+    const newPlanItem = {
       id: this.helper.generateUUID(),
       value: "New Plan"
-    });
+    };
 
+    this.planItems.push(newPlanItem);
     this.helper.serializePlanItems(this.planItems);
+
+    this.goToItem(newPlanItem);
   } 
 
   onItemDelete(deleteItem:PlanItem){

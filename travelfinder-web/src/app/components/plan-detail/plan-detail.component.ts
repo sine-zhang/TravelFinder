@@ -127,6 +127,13 @@ export class PlanDetailComponent  implements OnInit, OnDestroy,  AfterViewInit {
       return Plan.toLocationJSON(place);
     });
 
+    hintLocations.sort((a, b) => {
+      if (a.Day === b.Day) {
+        return a.Number - b.Number;
+      }
+      return a.Day - b.Day;
+    })
+
     let systemId = "gis_helper_3";
     const requestMessage = {
       content: JSON.stringify(hintLocations),
@@ -152,7 +159,7 @@ export class PlanDetailComponent  implements OnInit, OnDestroy,  AfterViewInit {
       this.groupPlaces = of(this.helper.groupBy(this.fullPlan.getPlaces(), (place:Place) => place.day));
       this.plan = of(this.fullPlan).pipe(take(1));
 
-      const stopLayer = this.routeService.createStopLayer(this.fullPlan.getPlaces());
+      const stopLayer = await this.routeService.createStopLayer(this.fullPlan.getPlaces());
 
       this.layers = this.routeService.createRouteLayer(stopLayer, this.planId).pipe(take(1));
 
@@ -167,7 +174,7 @@ export class PlanDetailComponent  implements OnInit, OnDestroy,  AfterViewInit {
     place.toggleStatus=!place.toggleStatus;
 
     if (place.toggleStatus) {
-      const result = await this.api.nearPoint(place.location.latitude, place.location.longitude, "en-us", 500);
+      const result = await this.api.nearPoint(this.planId, place.location.latitude, place.location.longitude, "en-us", 500);
 
       if (result?.Places) {
         place.suggestLocations = result.Places;
@@ -198,17 +205,6 @@ export class PlanDetailComponent  implements OnInit, OnDestroy,  AfterViewInit {
     });
 
     console.log(this.places);
-/*
-    const locationName = suggest.target.attributes['accessible-name'].value;
-    const suggestName = suggest.detail.item.attributes.text.value;
-
-    const location = this.places.find(location => location.Name == locationName);
-    const suggestLocation = location.suggestLocations.find((suggestLocation:any) => suggestLocation.DisplayName.Text == suggestName);
-
-    suggestLocation.MarkAsSuggest = true;
-
-    console.log(location.suggestLocations);
-    */
   }
 
   displayLoadingMusk(location:any) {
@@ -261,6 +257,60 @@ export class PlanDetailComponent  implements OnInit, OnDestroy,  AfterViewInit {
     this.messageService.saveMessages(this.planId, this.messageBody);
   }
 
+  dragStart(event: DragEvent, place: any) {
+    event.dataTransfer?.setData('text/plain', JSON.stringify(place));
+  }
+  
+  dragOver(event: DragEvent, place: any) {
+    event.preventDefault();
+    place.showDivider = true;
+  }
+  
+  drop(event: DragEvent, place: any) {
+    event.preventDefault();
+    place.showDivider = false;
+    const data = event.dataTransfer?.getData('text/plain');
+    if (data) {
+      const draggedPlace = JSON.parse(data);
+
+      if (draggedPlace.name != place.name) {
+        this.movePlace(draggedPlace, place);
+      }
+    }
+  }
+  
+  dragLeave(event: DragEvent, place:any) {
+    place.showDivider = false;
+  }
+
+  movePlace(fromPlace: Place, nextToPlace: Place) {
+    const newPlaces = this.places.filter((refPlace) => !(refPlace.number == fromPlace.number && refPlace.day == fromPlace.day));
+
+    fromPlace.day = nextToPlace.day;
+    fromPlace.number = nextToPlace.number + 1;
+ 
+    newPlaces.push(fromPlace);
+
+    newPlaces.forEach((place, index) => {
+      if (place.number > nextToPlace.number && place.day == nextToPlace.day) {
+        place.number = index + 1;
+      }
+    });
+
+    newPlaces.sort((a, b) => {
+      if (a.day === b.day) {
+        return a.number - b.number;
+      }
+      return a.day - b.day;
+    });
+
+    this.places = newPlaces;
+    this.groupPlaces = of(this.helper.groupBy(this.places, (place:Place) => place.day));
+  }
+
+  formatString(content:string) {
+    return this.helper.sanitizeString(content);
+  }
 
   isLoading:boolean = false;
   fullPlan!: Plan;

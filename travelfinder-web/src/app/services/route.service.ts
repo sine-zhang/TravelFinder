@@ -45,42 +45,43 @@ export class RouteService {
     return layer;
   }
 
-  createStopGraphic(places: Place[]) {
-    let graphics = places.map(place => {
+  async createStopGraphic(places: Place[]) {
+    const graphics = [];
 
-      let symbol:any = this.createIconSymbol(place);
-
+    for(const place of places) {
+      let symbol:any = await this.createIconSymbol(place);
       const graphic = new Graphic({
         symbol: symbol,
         geometry: new Point({
           latitude: place.location.latitude,
           longitude: place.location.longitude
         }),
-        attributes:{
+        attributes: {
+          Name: place.name,
           Day: place.day,
           Number: place.number,
-          Name: place.name,
-          CurbApproach: 0,
-          TimeWindowStart1: null,
-          TimeWindowEnd1: null
+          Sequence: 0,
+          PrimaryType: place.primaryType,
+          Cumul_TravelTime: 0,
+          Cumul_Kilometers: 0
         },
         popupTemplate: this.createPopTemplate(place)
       });
 
-      return graphic;
-    });
+      graphics.push(graphic);
+    }
 
     return graphics;
   }
 
-  upsertStopLayer(stopLayer:GraphicsLayer, places: Place[]) {
-    let graphics = this.createStopGraphic(places);
+  async upsertStopLayer(stopLayer:GraphicsLayer, places: Place[]) {
+    let graphics = await this.createStopGraphic(places);
     stopLayer.graphics.addMany(graphics);
   }
 
-  createStopLayer(places: Place[], attributes:any=null) {
+  async createStopLayer(places: Place[], attributes:any=null) {
     let layer = this.createEmptyStopLayer();
-    let graphics = this.createStopGraphic(places);
+    let graphics = await this.createStopGraphic(places);
 
     layer.graphics.addMany(graphics);
     return layer;
@@ -309,10 +310,10 @@ export class RouteService {
             returnDirections: true
           });
 
-          Route.solve(environment.ROUTE_URL, routeParams).then((solveResult) => {
+          Route.solve(environment.ROUTE_URL, routeParams).then(async (solveResult) => {
             console.log(solveResult);
 
-            solveResult.routeResults.forEach((result) => {
+            solveResult.routeResults.forEach(async (result) => {
               const lineSymbol = new CIMSymbol({
                 data: {
                   type: "CIMSymbolReference",
@@ -379,12 +380,15 @@ export class RouteService {
 
               routeLayer.graphics.add(result.route);
 
-              result.stops.forEach((stop, index) => {
+              for (const stop of result.stops) {
                 const stopGraphic = updatedStopLayer.graphics.find(graphic => graphic.attributes.Name == stop.attributes.Name);
                 stopGraphic.attributes.Sequence = stop.attributes.Sequence;
                 stopGraphic.attributes.Cumul_TravelTime = stop.attributes.Cumul_TravelTime;
                 stopGraphic.attributes.Cumul_Kilometers = stop.attributes.Cumul_Kilometers;
-              });
+
+                const symbol = await this.createIconSymbol({primaryType: stopGraphic.attributes.PrimaryType, sequence: stopGraphic.attributes.Sequence});
+                stopGraphic.symbol.set("url", symbol.url);
+              }
     
               sub.next([routeLayer,updatedStopLayer]);
               sub.complete();
@@ -412,14 +416,14 @@ export class RouteService {
     });
   }
 
-  createIconSymbol(place: Place) {
-   const icon = this.helper.getIcon(place.primaryType);
+  async createIconSymbol(place: any) {
+   const icon = await this.helper.getIconWithNumber(place.primaryType, place.sequence);
 
    let symbol = {
     type: "picture-marker",
-    url: icon,
-    width: "32px",
-    height: "32px",
+    url: icon.url,
+    width: `${icon.width}px`,
+    height: `${icon.height}px`,
     outline: {
       color: [0, 0, 0, 0.7],
       width: 0.5

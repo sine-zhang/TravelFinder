@@ -92,7 +92,7 @@ export class PlanPage implements OnInit {
 
       });
 
-      this.api.jsonMessage.subscribe(message => {
+      this.api.jsonMessage.subscribe(async message => {
         if (!message) return;
 
         this.jsonResult += message;
@@ -103,7 +103,7 @@ export class PlanPage implements OnInit {
         if (this.fullPlan.getPlaces().length > 0) {
           this.stopLayer.graphics.removeAll();
 
-          this.routeService.upsertStopLayer(this.stopLayer, this.fullPlan.getPlaces());
+          await this.routeService.upsertStopLayer(this.stopLayer, this.fullPlan.getPlaces());
           this.layers = of([this.stopLayer]);
         }
 
@@ -117,7 +117,7 @@ export class PlanPage implements OnInit {
     return values != null ? values[1] : "";
   }
 
-  initGroupStopLayer(places: Place[]) {
+  async initGroupStopLayer(places: Place[]) {
     const groupPlaces = this.helper.groupBy(places, place => place.day);
 
     for(let [day, subPlaces] of groupPlaces) {
@@ -132,7 +132,7 @@ export class PlanPage implements OnInit {
         stopLayer.layer.graphics.removeAll();
       }
 
-      this.routeService.upsertStopLayer(stopLayer.layer, subPlaces);
+      await this.routeService.upsertStopLayer(stopLayer.layer, subPlaces);
     }
   }
 
@@ -401,12 +401,14 @@ export class Plan {
             number: location.Number,
             day: location.Day,
             stopTime: location.Duration,
+            priceLevel: location.PriceLevel,
             travelTime: 0,
             toggleStatus: false,
             suggestLocations: [],
             hint: "",
             distance: 0,
-            sequence: 0
+            sequence: 0,
+            showDivider: false
           }
       });
 
@@ -430,7 +432,8 @@ export class Plan {
       SuggestReason: place.reason,
       Number: place.number,
       Day: place.day,
-      Duration: place.stopTime
+      Duration: place.stopTime,
+      PriceLevel: place.priceLevel
     };
   }
 
@@ -469,7 +472,8 @@ export class Plan {
           SuggestReason: place.reason,
           Number: place.number,
           Day: place.day,
-          Duration: place.stopTime
+          Duration: place.stopTime,
+          PriceLevel: place.priceLevel
         }
       })
     };

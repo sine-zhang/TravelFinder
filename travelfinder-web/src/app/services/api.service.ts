@@ -191,8 +191,8 @@ export class ApiService {
     return this.messages.asObservable();
   }
 
-  async nearPoint(latitude:number, longitude:number, langCode:string, radius:number) {
-    const response = await fetch(`${environment.API_URL}/map/nearpoint?latitude=${latitude}&longitude=${longitude}&languageCode=${langCode}&radius=${radius}`, {
+  async nearPoint(requestId:string, latitude:number, longitude:number, langCode:string, radius:number) {
+    const response = await fetch(`${environment.API_URL}/map/nearpoint?requestId=${requestId}&latitude=${latitude}&longitude=${longitude}&languageCode=${langCode}&radius=${radius}`, {
       method: "GET",
       cache: "no-cache"
     });
@@ -255,8 +255,10 @@ export interface Place {
   stopTime: number,
   distance: number,
   sequence: number,
+  priceLevel: string,
 
   toggleStatus: boolean,
   suggestLocations: any[],
-  hint: string
+  hint: string,
+  showDivider: boolean
 }
