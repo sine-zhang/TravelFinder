@@ -135,7 +135,7 @@ namespace TravelfinderAPI.GmpGis
                 };
 
                 httpClient.DefaultRequestHeaders.Add("X-Goog-Api-Key", _apiKey);
-                httpClient.DefaultRequestHeaders.Add("X-Goog-FieldMask", "places.displayName,places.formattedAddress,places.primaryType,places.rating,places.location,places.id");
+                httpClient.DefaultRequestHeaders.Add("X-Goog-FieldMask", "places.displayName,places.formattedAddress,places.primaryType,places.rating,places.location,places.id,places.price_level");
 
                 var response = await httpClient.PostAsync("https://places.googleapis.com/v1/places:searchNearby", JsonContent.Create(requestBody));
                 response.EnsureSuccessStatusCode();
@@ -183,6 +183,8 @@ namespace TravelfinderAPI.GmpGis
 
         public DisplayName DisplayName { get; set; }
         public Location Location { get; set; }
+
+        public string PriceLevel { get; set; }
     
     }
 
