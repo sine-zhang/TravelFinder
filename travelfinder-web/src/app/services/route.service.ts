@@ -60,7 +60,6 @@ export class RouteService {
           Name: place.name,
           Day: place.day,
           Number: place.number,
-          Sequence: 0,
           PrimaryType: place.primaryType,
           Cumul_TravelTime: 0,
           Cumul_Kilometers: 0

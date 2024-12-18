@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, AfterViewInit} from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, Input, OnChanges, SimpleChanges} from '@angular/core';
 import { IonicsModule } from 'src/app/shared/ionics.module';
 import { UI5Module } from 'src/app/shared/ui5.module';
 import { IonicModule } from '@ionic/angular';
@@ -32,7 +32,7 @@ import { Helper } from 'src/app/shared/helper';
     LoadingDirective,
   ]
 })
-export class PlanDetailComponent  implements OnInit, OnDestroy,  AfterViewInit {
+export class PlanDetailComponent  implements OnInit, OnDestroy, AfterViewInit {
 
   constructor(private router: Router,
               private api: ApiService,
@@ -41,29 +41,45 @@ export class PlanDetailComponent  implements OnInit, OnDestroy,  AfterViewInit {
               private messageService: MessageService,
               private helper: Helper) {
     this.currentCoords = {lat:0,lng:0};
-    // this.inputForm = this.fb.group({
-    //   places: [[]]
-    // });
     this.places = [];
     this.plan = of(this.fullPlan);
   }
 
   async ngOnInit() {
-    this.plan = this.router.events.pipe(filter(event => event instanceof NavigationEnd), map(() => {
-      const plan = this.getPlan(this.planId);
+    if (this.planID) {
+      this.initPlan(this.planID);
+    }
+    // this.plan = this.router.events.pipe(filter(event => event instanceof NavigationEnd), map(() => {
+    //   const plan = this.getPlan(this.planId);
 
-      if (plan.planModel) {
-        console.log("123", plan);
+    //   if (plan.planModel) {
+    //     console.log("123", plan);
 
-        this.fullPlan = plan;
-        this.places = plan.planModel.places;
-        const groupPlaces = this.helper.groupBy(plan.planModel.places, (place:Place) => place.day);
-        this.groupPlaces = of(groupPlaces);
-        plan.planModel.groupPlaces = groupPlaces;
-      }
+    //     this.fullPlan = plan;
+    //     this.places = plan.planModel.places;
+    //     const groupPlaces = this.helper.groupBy(plan.planModel.places, (place:Place) => place.day);
+    //     this.groupPlaces = of(groupPlaces);
+    //     plan.planModel.groupPlaces = groupPlaces;
+    //   }
 
-      return plan;
-    }));
+    //   return plan;
+    // }));
+  }
+
+  initPlan(planId:string) {
+    const plan = this.getPlan(planId);
+
+    if (plan.planModel) {
+      console.log("123", plan);
+
+      this.fullPlan = plan;
+      this.places = plan.planModel.places;
+      const groupPlaces = this.helper.groupBy(plan.planModel.places, (place:Place) => place.day);
+      this.groupPlaces = of(groupPlaces);
+      plan.planModel.groupPlaces = groupPlaces;
+    }
+
+    this.plan = of(plan);
   }
 
   ngAfterViewInit() {
@@ -108,7 +124,7 @@ export class PlanDetailComponent  implements OnInit, OnDestroy,  AfterViewInit {
         const hint = place.hint;
         place.hint = null;
 
-        return { Day: place.day, Number: place.number, Hint: hint };
+        return { Day: place.day, Number: place.number, Hint: hint, PriceLevel: place.priceLevel};
       }
       else if (suggestedLocation) {
         suggestedLocation.MarkAsSuggest = false;
@@ -120,7 +136,8 @@ export class PlanDetailComponent  implements OnInit, OnDestroy,  AfterViewInit {
                   Latitude: suggestedLocation.Location.latitude,
                   PrimaryType: suggestedLocation.PrimaryType,
                   Name: suggestedLocation.DisplayName.Text,
-                  FormattedAddress: suggestedLocation.FormattedAddress
+                  FormattedAddress: suggestedLocation.FormattedAddress,
+                  PriceLevel: suggestedLocation.PriceLevel,
                 }
       }
 
@@ -312,6 +329,15 @@ export class PlanDetailComponent  implements OnInit, OnDestroy,  AfterViewInit {
     return this.helper.sanitizeString(content);
   }
 
+  /*
+  async ngOnChanges(changes: SimpleChanges) {
+    const planId = changes["planID"]?.currentValue as string;
+    if (planId) {
+      this.initPlan(planId);
+    }
+  }
+*/
+
   isLoading:boolean = false;
   fullPlan!: Plan;
   plan: Observable<Plan>;
@@ -334,4 +360,7 @@ export class PlanDetailComponent  implements OnInit, OnDestroy,  AfterViewInit {
 
   planPath!:string;
   groupPlaces!: Observable<Map<number, Place[]>>;
+
+  @Input()
+  planID: string = "";
 }

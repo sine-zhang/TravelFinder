@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, TemplateRef, ViewChild, ViewContainerRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
@@ -41,7 +41,8 @@ import { MessageService } from 'src/app/services/message.service';
             MapComponent,
             AppLoaderComponent,
             LoadingDirective,
-            LongPressDirective
+            LongPressDirective,
+            PlanDetailComponent
           ]
 })
 export class PlanPage implements OnInit {
@@ -110,6 +111,10 @@ export class PlanPage implements OnInit {
       });
   }
 
+  ngAfterContentInit() {
+    this.outletRef.createEmbeddedView(this.contentRef);
+  }
+
   get planId() {
     const reg = /plan\/(.+)/g;
     const values = reg.exec(this.router.url);
@@ -164,7 +169,7 @@ export class PlanPage implements OnInit {
           console.log(layer);
 
           if (layer) {
-            this.router.navigateByUrl(`/detail/${layer.graphic.attributes.id}`, { replaceUrl: true } );
+            this.openPlanDetail(layer.graphic.attributes.id);
           }
         }
       });
@@ -178,6 +183,15 @@ export class PlanPage implements OnInit {
       latitude: this.currentCoords.lat,
       longitude: this.currentCoords.lng
     }));
+  }
+
+  openPlanDetail(planId:string) {
+    this.planID = planId;
+
+    this.outletRef.clear();
+    this.outletRef.createEmbeddedView(this.contentRef);
+
+    // this.router.navigateByUrl(`/detail/${planId}`, { replaceUrl: true } );
   }
 
   getCurrentCoords(view:MapView) {
@@ -354,6 +368,16 @@ export class PlanPage implements OnInit {
   stopLayers!: StopLayer[];
 
   fullPlan: Plan;
+
+  planID: string = "";
+
+  @ViewChild("outlet", {static: true, read: ViewContainerRef})
+  outletRef!: ViewContainerRef;
+  
+  @ViewChild("content", {static: true, read: TemplateRef})
+  contentRef!: TemplateRef<any>;
+
+  layoutMode = `OneColumn`;
 }
 
 export interface PlanModel {
@@ -378,7 +402,7 @@ export class Plan {
     }
   }
 
-  static getPlaces(obj: any): Place[] {
+  static getPlaces(obj: any, updateAll=true): Place[] {
     let locations = [];
 
     if (Array.isArray(obj)) {
@@ -485,7 +509,7 @@ export class Plan {
     this.planModel.places = Plan.getPlaces(detlaPlan);
   }
 
-  updatePlanByLocations(locations: []) {
+  updatePlanByLocations(locations: [], updateAll = true) {
     this.planModel.places = Plan.getPlaces(locations);
   }
 

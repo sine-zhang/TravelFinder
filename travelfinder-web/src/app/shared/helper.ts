@@ -87,6 +87,7 @@ export class Helper {
       // Adjust width and height
       xmlDoc.documentElement.setAttribute("width", width.toString());
       xmlDoc.documentElement.setAttribute("height", height.toString());
+      xmlDoc.documentElement.setAttribute("x", "5%");
 
       const svgContent = xmlDoc.documentElement.outerHTML;
       this.iconCache.set(category, svgContent);
@@ -106,7 +107,7 @@ export class Helper {
   getIconWithNumber = async (category:string, sequence:number) => {
       var iconSvg = await this.getIconXmlContent(category);
       var sequenceLabel = sequence > 0 ? `
-        <text text-anchor="middle" font-size="20" font-family="Consolas" x="70%" y="70%" dy=".3em" stroke-width="0" fill="#81C4FF" filter="url(#shadow)">${sequence}</text>` : "";
+        <text text-anchor="middle" font-size="20" font-family="Consolas" x="70%" y="70%" dy=".3em" stroke-width="0" fill="#E7222E" filter="url(#shadow)">${sequence}</text>` : "";
       var svgString = `
         <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36">
             <defs>
@@ -115,7 +116,7 @@ export class Helper {
                 </filter>
             </defs>
             <g>
-                <circle cx="17" cy="17" r="17" stroke="black" stroke-width="0.7" fill="none"/>
+                <circle cx="17" cy="17" r="17" stroke="black" stroke-width="0.7" x="2%" fill="none"/>
                 ${iconSvg}
                 ${sequenceLabel}
             </g>

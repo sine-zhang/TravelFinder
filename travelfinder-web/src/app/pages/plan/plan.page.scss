@@ -41,6 +41,17 @@ ui5-button:disabled {
   opacity: 100;
 }
 
+.map-column {
+  display: flex;
+  justify-content: end;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.detail-column {
+  height: 100%;
+}
 
 @media (max-width: 700px) {
   .send-container {
