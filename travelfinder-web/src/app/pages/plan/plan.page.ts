@@ -191,6 +191,8 @@ export class PlanPage implements OnInit {
     this.outletRef.clear();
     this.outletRef.createEmbeddedView(this.contentRef);
 
+    this._layoutMode = "TwoColumnsStartExpanded";
+
     // this.router.navigateByUrl(`/detail/${planId}`, { replaceUrl: true } );
   }
 
@@ -349,6 +351,10 @@ export class PlanPage implements OnInit {
     await this.featureLayer.applyEdits(requestMessage);
   }
 
+  onPlanDetailClose(planId:any) {
+    this._layoutMode = "OneColumn";
+  }
+
   layers: Observable<GraphicsLayer[]> = new Observable<GraphicsLayer[]>();
   inputForm: FormGroup<any>;
   currentCoords:{
@@ -377,7 +383,11 @@ export class PlanPage implements OnInit {
   @ViewChild("content", {static: true, read: TemplateRef})
   contentRef!: TemplateRef<any>;
 
-  layoutMode = `OneColumn`;
+  get layoutMode() {
+    return this._layoutMode as "OneColumn" | "TwoColumnsStartExpanded" | "TwoColumnsMidExpanded" | "ThreeColumnsMidExpanded" | "ThreeColumnsEndExpanded" | "ThreeColumnsStartExpandedEndHidden" | "ThreeColumnsMidExpandedEndHidden" | "MidColumnFullScreen" | "EndColumnFullScreen";
+  }
+
+  _layoutMode:string = "OneColumn";
 }
 
 export interface PlanModel {

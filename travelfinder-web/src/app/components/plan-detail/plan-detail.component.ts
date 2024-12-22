@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, AfterViewInit, Input, OnChanges, SimpleChanges} from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, Input, OnChanges, SimpleChanges, Output} from '@angular/core';
 import { IonicsModule } from 'src/app/shared/ionics.module';
 import { UI5Module } from 'src/app/shared/ui5.module';
 import { IonicModule } from '@ionic/angular';
@@ -15,6 +15,7 @@ import { AppLoaderComponent } from '../app-loader/app-loader.component';
 import { MessageService } from 'src/app/services/message.service';
 import { Plan } from 'src/app/pages/plan/plan.page';
 import { Helper } from 'src/app/shared/helper';
+import { EventEmitter } from '@angular/core';
 
 @Component({
   selector: 'plan-detail',
@@ -49,21 +50,6 @@ export class PlanDetailComponent  implements OnInit, OnDestroy, AfterViewInit {
     if (this.planID) {
       this.initPlan(this.planID);
     }
-    // this.plan = this.router.events.pipe(filter(event => event instanceof NavigationEnd), map(() => {
-    //   const plan = this.getPlan(this.planId);
-
-    //   if (plan.planModel) {
-    //     console.log("123", plan);
-
-    //     this.fullPlan = plan;
-    //     this.places = plan.planModel.places;
-    //     const groupPlaces = this.helper.groupBy(plan.planModel.places, (place:Place) => place.day);
-    //     this.groupPlaces = of(groupPlaces);
-    //     plan.planModel.groupPlaces = groupPlaces;
-    //   }
-
-    //   return plan;
-    // }));
   }
 
   initPlan(planId:string) {
@@ -329,6 +315,10 @@ export class PlanDetailComponent  implements OnInit, OnDestroy, AfterViewInit {
     return this.helper.sanitizeString(content);
   }
 
+  close() {
+    this.onClose.emit(this.planId);
+  }
+
   /*
   async ngOnChanges(changes: SimpleChanges) {
     const planId = changes["planID"]?.currentValue as string;
@@ -363,4 +353,7 @@ export class PlanDetailComponent  implements OnInit, OnDestroy, AfterViewInit {
 
   @Input()
   planID: string = "";
+
+  @Output()
+  onClose: EventEmitter<string> = new EventEmitter<string>();
 }

@@ -1,24 +1,15 @@
-<ion-header>
-  <ion-toolbar>
-    <ion-buttons slot="start">
-      <ion-button (click)="goBack()">
-        <ui5-icon name="arrow-left"></ui5-icon>
-      </ion-button>
-    </ion-buttons>
-  </ion-toolbar>
-</ion-header>
 <ion-content>
   <ui5-dynamic-page id="page" show-footer>
     <ui5-dynamic-page-title slot="titleArea">
       <ui5-title wrapping-type="None" slot="heading">
         {{ (plan | async)?.planModel?.name }}
       </ui5-title>
-
-      <div class="actionsToolbar" ></div>
-      <ui5-toolbar  slot="actionsBar" design="Transparent">
+      <div class="actionsToolbar">
+        <ui5-toolbar class="navigationBar" slot="navigationBar" design="Transparent">
           <ui5-toolbar-button id="edit-button" design="Transparent" [icon]="isLoading ? 'lateness':'ai'" (click)="submitHint()" [disabled]="isLoading"></ui5-toolbar-button>
-      </ui5-toolbar>
-
+          <ui5-toolbar-button design="Transparent" icon="decline" (click)="close()"></ui5-toolbar-button>
+        </ui5-toolbar>
+      </div>
     </ui5-dynamic-page-title>
 
     <ui5-dynamic-page-header slot="headerArea">

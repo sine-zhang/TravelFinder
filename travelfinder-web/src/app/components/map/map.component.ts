@@ -1,4 +1,5 @@
 import { Component, ElementRef, Input, OnChanges, OnInit, Output, SimpleChanges, ViewChild } from '@angular/core';
+import { IonicModule } from '@ionic/angular';
 import WebMap from '@arcgis/core/WebMap';
 import MapView from '@arcgis/core/views/MapView';
 import Point from '@arcgis/core/geometry/Point';
@@ -25,7 +26,10 @@ const MAX_SCALE = 50000;
   selector: 'map',
   templateUrl: './map.component.html',
   styleUrls: ['./map.component.scss'],
-  standalone: true
+  standalone: true,
+  imports:[
+    IonicModule,
+  ]
 })
 export class MapComponent implements OnInit, OnChanges {
 
