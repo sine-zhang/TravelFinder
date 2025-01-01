@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Caching.Memory;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System.Drawing.Printing;
 using System.Reflection;
 using System.Text;
@@ -135,7 +136,7 @@ namespace TravelfinderAPI.GmpGis
                 };
 
                 httpClient.DefaultRequestHeaders.Add("X-Goog-Api-Key", _apiKey);
-                httpClient.DefaultRequestHeaders.Add("X-Goog-FieldMask", "places.displayName,places.formattedAddress,places.primaryType,places.rating,places.location,places.id,places.price_level");
+                httpClient.DefaultRequestHeaders.Add("X-Goog-FieldMask", "places.displayName,places.formattedAddress,places.id,places.primaryType,places.rating,places.location,places.price_level");
 
                 var response = await httpClient.PostAsync("https://places.googleapis.com/v1/places:searchNearby", JsonContent.Create(requestBody));
                 response.EnsureSuccessStatusCode();
@@ -184,8 +185,35 @@ namespace TravelfinderAPI.GmpGis
         public DisplayName DisplayName { get; set; }
         public Location Location { get; set; }
 
-        public string PriceLevel { get; set; }
-    
+        public string PriceLevel {
+            get
+            {
+                string priceLevelName = "Unknown";
+                switch (this.priceLevel)
+                {
+                    case "PRICE_LEVEL_FREE":
+                        priceLevelName = "Free";
+                        break;
+                    case "PRICE_LEVEL_INEXPENSIVE":
+                        priceLevelName = "Inexpensive";
+                        break;
+                    case "PRICE_LEVEL_MODERATE":
+                        priceLevelName = "Moderate";
+                        break;
+                    case "PRICE_LEVEL_EXPENSIVE":
+                        priceLevelName = "Expensive";
+                        break;
+                    case "PRICE_LEVEL_VERY_EXPENSIVE":
+                        priceLevelName = "VeryExpensive";
+                        break;
+                }
+
+                return priceLevelName;
+            }
+        }
+
+        public string priceLevel { get; set; }
+
     }
 
     public class DisplayName
